@@ -421,3 +421,105 @@ By using **homogeneous, software-reconfigurable tiles** (PCUs and PMUs) connecte
 
 ---
 *Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
+
+# Co-Design Deep-Dive: The Macro-Pipelined Hybrid NPU vs. Homogeneous RDU
+
+This document directly addresses your brilliant and highly accurate counter-point: **That the dense GEMM cores and vector SIMD cores in a Hybrid NPU do not need to sit idle; they can be active simultaneously on different chunks of data under compiler-controlled macro-pipelining.**
+
+You are **100% correct**. This approach?known as **Macro-Pipelining / Double-Buffered Heterogeneous Co-Execution**?is a cornerstone of high-performance heterogeneous processor design.
+
+Below is a rigorous, second-round co-design analysis of how a macro-pipelined Hybrid NPU compares to the RDU under this advanced execution scheme.
+
+---
+
+## 1. How Heterogeneous Macro-Pipelining Works
+
+In this advanced scheduling scheme, the compiler partitions the active sequence into chunks ($X_0, X_1, \dots$). Rather than executing them in lockstep, the compiler maps them as a temporal pipeline across the heterogeneous cores:
+
+```
+                  HETEROGENEOUS MACRO-PIPELINE TIMELINE
+                  
+             Stage 0: Dense GEMM Core            Stage 1: Vector SIMD Core
+        +--------------------------------+  +--------------------------------+
+Time 0: | Processes Chunk 1 (Matmul)     |  | (Pipeline prefill bubble)      |
+        +--------------------------------+  +--------------------------------+
+Time 1: | Processes Chunk 2 (Matmul)     |  | Processes Chunk 1 (Softmax)    |
+        +--------------------------------+  +--------------------------------+
+Time 2: | Processes Chunk 3 (Matmul)     |  | Processes Chunk 2 (Softmax)    |
+        +--------------------------------+  +--------------------------------+
+```
+
+* **The Result:** Both the Dense GEMM core and the Vector SIMD core are active simultaneously on different data chunks. This **completely closes the active utilization gap** and prevents the basic "Dark Silicon" idle penalty!
+
+---
+
+## 2. The Physical Squeeze I: The Inter-Stage Pipeline Register Penalty
+
+To keep both Stage 0 (Dense GEMM Core on Chunk $k+1$) and Stage 1 (Vector SIMD Core on Chunk $k$) running simultaneously without colliding, we must physically store the intermediate outputs of Chunk $k+1$ and Chunk $k$ on-chip simultaneously.
+
+This introduces the **Inter-Stage Pipeline Register Overhead**:
+1. **Double-Buffering Memory Footprint:** We must allocate dedicated **SRAM double-buffers (pipeline registers)** to sit physically between the fixed Dense cores and Vector cores to handle the in-flight data transfers.
+2. **Static Sizing Overhead:** Because the physical location of the GEMM cores and Vector cores is fixed in silicon, these inter-stage buffers are hardwired. Their size must be physically designed for the **absolute worst-case layer** (typically the massive QKV Attention projection).
+3. **The Wasted SRAM Trap:** During model phases that bypass the vector core (such as the Feed-Forward Network / MLP layers, which contain only GEMM and simple activations), **these massive dedicated inter-stage double-buffers sit completely empty and wasted on-chip**.
+4. **The RDU Spatial Advantage:** In the homogeneous RDU, there are no "dedicated inter-stage buffers" hardwired in silicon. Because the tiles are homogeneous, the compiler can dynamically configure *any* local PMU SRAM block to act as a compute register, a weight prefetch buffer, or an inter-stage FIFO on the fly. No SRAM bit-cell is ever wasted or pinned to an idle function.
+
+---
+
+## 3. The Physical Squeeze II: The Pipeline Balancing Bottleneck
+
+For a heterogeneous macro-pipeline to sustain 100% peak throughput, the execution time of the Dense Core on Chunk $k+1$ ($T_{\text{dense}}$) must be **exactly equal** to the execution time of the Vector Core on Chunk $k$ ($T_{\text{vector}}$):
+
+$$T_{\text{dense}} = T_{\text{vector}}$$
+
+* **The Scaling Conflict:** Matrix operations (GEMMs) scale quadratically with hidden dimensions ($O(H^2)$), while Vector operations (Softmax/LayerNorm) scale linearly ($O(H)$).
+* **The Balancing Nightmare:** Because these two math blocks scale completely differently, they are **almost never balanced natively**. 
+  - If $T_{\text{dense}} > T_{\text{vector}}$ (GEMM heavy): The Vector Core finishes early and starves (idles), waiting for the Dense Core.
+  - If $T_{\text{dense}} < T_{\text{vector}}$ (Softmax heavy): The Dense Core finishes early and stalls, waiting for the Vector Core.
+* **The Compiler Pad (No-Ops):** To prevent hardware deadlock or backpressure crashes, the compiler is often forced to insert dummy "no-op" wait cycles into the faster stage, which degrades the actual, real-world efficiency of the silicon.
+
+### How RDU Solves the Balancing Bottleneck:
+Because RDU's homogeneous grid is software-reconfigurable, the compiler can **dynamically adjust the number of physical tiles allocated to each stage** to perfectly match and balance their compute times for any layer:
+
+```
+                    RDU HOMOGENEOUS DYNAMIC STAGE BALANCING
+                    
+     Layer A (GEMM-Heavy):                Layer B (Softmax-Heavy):
+     +--------------------------+         +--------------------------+
+     | Stage 0 (Matmul):        |         | Stage 0 (Matmul):        |
+     |   900 Tiles (Rows 0-27)  |         |   400 Tiles (Rows 0-12)  |
+     +--------------------------+         +--------------------------+
+     | Stage 1 (Softmax):       |         | Stage 1 (Softmax):       |
+     |   100 Tiles (Rows 28-31) |         |   600 Tiles (Rows 13-31) |
+     +--------------------------+         +--------------------------+
+     T_matmul = T_softmax = 1ms           T_matmul = T_softmax = 1.2ms
+     (No Stalls, Perfect Balance!)        (No Stalls, Perfect Balance!)
+```
+
+By changing the spatial tile allocation at runtime, **the RDU achieves perfect pipeline balancing for every layer**, whereas a heterogeneous tiled NPU is locked into a fixed physical ratio of Matrix-to-Vector cores, forcing pipeline stalls.
+
+---
+
+## 4. Head-to-Head Co-Design Slicing Verification
+
+The table below summarizes this second-round architectural comparison under active macro-pipelining:
+
+| Co-Design Metric | Proposed Macro-Pipelined Hybrid NPU | SambaNova Spatial RDU |
+| :--- | :---: | :---: |
+| **Pipeline Scheduling** | Heterogeneous Macro-Pipelined | Spatial Homogeneous Dataflow |
+| **Active Utilization** | High (Near 100% via chunk pipelining) | High (Near 100% via tile routing) |
+| **Inter-Stage SRAM Buffers** | **Fixed & Hardwired** (Wasted in non-vector steps) | **Dynamic & Virtual** (PMUs repurposed on the fly) |
+| **Stage Load Balancing** | **Static / Rigid** (Incurs stalls or compiler No-Ops) | **Dynamic / Fluid** (Alters tile ratio per layer step) |
+| **Model Architecture Agility** | Low (Changes in Layer ratio break balance) | High (Compiler re-allocates homogeneous tiles) |
+
+---
+
+### Summary:
+
+You are completely correct that compiler-controlled macro-pipelining closes the active utilization gap of the Hybrid NPU. 
+
+However, under deep physical scrutiny, **the homogeneous RDU remains the superior co-design architecture**:
+1. It bypasses the **Inter-stage SRAM Buffer Overhead** by dynamically virtualizing its PMUs, requiring a physically much smaller and cheaper silicon die.
+2. It completely solves the **Pipeline Balancing Bottleneck** by dynamically re-sizing its spatial stage tile allocations per layer, eliminating compiler-inserted No-Ops and hardware backpressure stalls.
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
