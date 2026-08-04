@@ -175,3 +175,87 @@ The cycle-approximate C++ simulation results mandate specific physical layout mo
 ---
 
 *Report compiled, math-checked, and finalized by the Dual-Tier Co-Design Validation Group.*
+
+# Why the Temporal NPU Cannot Chunk Both Weights and Activations Simultaneously
+
+This document provides a rigorous, first-principles computer architecture explanation of why the centralized temporal NPU cannot segment both weights and activations into chunks simultaneously to reduce off-chip memory traffic, whereas the SambaNova Spatial RDU does this natively.
+
+---
+
+## 1. The Mathematical Reality: The "All-to-All" Matrix Dependency
+
+To compute a matrix multiplication $Y = W \times X$ (where $W$ is the Weight matrix and $X$ is the Activation/Query tensor):
+* Every element of the output matrix $Y_{i, j}$ is a dot product of row $i$ of $W$ and column $j$ of $X$.
+* If we attempt to segment both matrices into chunks:
+  - Let weights $W$ be sliced into $R$ blocks ($W_0, W_1, \dots, W_{R-1}$).
+  - Let activations $X$ be sliced into $C$ blocks ($X_0, X_1, \dots, X_{C-1}$).
+* To calculate the complete output $Y$, the hardware must compute the cross-product of **all pairs** ($W_k, X_j$):
+  $$Y_{k, j} = W_k \times X_j \quad \forall k \in [0, R-1], \, j \in [0, C-1]$$
+* This results in exactly **$R \times C$ independent chunk-multiplication operations**.
+
+---
+
+## 2. Why the Temporal NPU Fails: The Sequential Squeeze
+
+In a TPU-style NPU, the PE array is a **monolithic, centralized compute block**. Because it executes temporally (one operation sequentially after another), it can only hold a single weight chunk and a single activation chunk in its local register files at any one cycle. 
+
+If the NPU slices both weights and activations, it is trapped in a devastating loop:
+
+```
+               THE NPU TEMPORAL CHUNKING LOOP (R=16, C=16)
+               
+   Cycle 0: Load W_0 & X_0   =======> Compute W_0 * X_0
+   Cycle 1: Keep W_0, Load X_1 =====> Compute W_0 * X_1
+   ...
+   Cycle 15: Keep W_0, Load X_15 ====> Compute W_0 * X_15  (All X_j kicked out!)
+   
+   Cycle 16: Load W_1. 
+             But wait! To compute W_1 * X_j, the NPU MUST reload X_0, X_1, ..., X_15 
+             from off-chip HBM because on-chip SRAM had to clear them!
+```
+
+### The "Choice of Deaths" Squeeze:
+* **Option A:** Keep the weights on-chip. Since weights are $1.85\text{ GB}$, they overflow the 256MB SRAM. We cannot do this.
+* **Option B:** Slice both. To compute the $16 \times 16 = 256$ chunk operations, the NPU must load:
+  - Weight Chunk $W_k$ $\rightarrow$ loaded **16 times** (once for each activation chunk).
+  - Activation Chunk $X_j$ $\rightarrow$ loaded **256 times** (re-loaded for every new weight chunk).
+* **The Verdict:** If a temporal accelerator chunks both matrices, **it creates a catastrophic quadratic traffic multiplier ($R \times C$ reloads)**! No matter what scheduling order is chosen, one of the two matrices must be thrashed and reloaded off-chip repeatedly.
+
+---
+
+## 3. How the Spatial RDU Bypasses This: The Spatial Pipeline
+
+The RDU completely bypasses the $R \times C$ thrashing penalty because its compute is **mapped spatially across 1024 independent tiles**. Instead of computing chunk-multiplications sequentially on a single monolithic PE, the RDU's spatial compiler unrolls the execution graph and pins different weight chunks to different tile rows:
+
+```
+                  RDU SPATIAL PIPELINED ASSEMBLY LINE
+                  
+   Activation Chunks  ===> [Row 0: Pins W_0] ===(NoC)===> [Row 1: Pins W_1] ===> Out
+   
+   Cycle 0: Row 0 computes W_0 * X_0
+   Cycle 1: Row 1 computes W_1 * X_0  (In parallel with Row 0 computing W_0 * X_1)
+   Cycle 2: Row 2 computes W_2 * X_0  (In parallel with Row 1 computing W_1 * X_1)
+```
+
+### Why it Triumphs:
+1. **Pinned Weights:** Each weight chunk $W_k$ is loaded from HBM **exactly ONCE** and pinned permanently inside the local PMUs of a specific tile row (e.g., Row 0 holds $W_0$, Row 1 holds $W_1$).
+2. **Streaming Activations:** The activation chunks $X_0, X_1, \dots$ stream **spatially over NoC wires** from row to row like cars on an assembly line. 
+3. **Double-Buffering & Zero Spills:** Because the activations flow purely on-chip from row to row, **activations are loaded off-chip exactly ONCE**. 
+4. **Total Traffic:** Total HBM traffic is exactly:
+   $$\text{HBM Traffic} = 1\times \text{Weights} + 1\times \text{Activations}$$
+   The $R \times C$ cross-product dependency is completely resolved **on-chip using spatial NoC routing and pipelining**, rather than off-chip memory thrashes!
+
+---
+
+## 4. Head-to-Head HBM Slicing Comparison
+
+The table below contrasts how memory chunking affects off-chip data movement under extreme sequence serving:
+
+| Architecture Slicing | Weights Chunked? | Activations Chunked? | Weight HBM Loads | Activation HBM Loads | Total Off-Chip HBM Traffic |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **NPU Monolithic** | No | No | 1x | $C$ times | **1x Weights + $C$x Activations (Spill Wall)** |
+| **NPU Chunked** | Yes | Yes | $C \times R$ times | 1x | **$C \times R$x Weights + 1x Activations (Weight Amplification)** |
+| **RDU Spatial** | **Yes** | **Yes** | **1x** | **1x** | **1x Weights + 1x Activations (Zero Spills)** |
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
