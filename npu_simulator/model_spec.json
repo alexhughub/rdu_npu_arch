@@ -1,0 +1,22 @@
+[
+  {
+    "model_name": "LLaMA-3-70B",
+    "type": "dense",
+    "num_layers": 80,
+    "hidden_dim": 8192,
+    "ffn_dim": 28672,
+    "seq_len": 8192,
+    "weight_size_mb": 1856.0
+  },
+  {
+    "model_name": "DeepSeek-V3-MoE",
+    "type": "moe",
+    "num_layers": 61,
+    "hidden_dim": 7168,
+    "seq_len": 8192,
+    "num_shared_experts": 1,
+    "num_routed_experts": 256,
+    "routed_experts_per_token": 8,
+    "weight_size_mb": 1150.0
+  }
+]
