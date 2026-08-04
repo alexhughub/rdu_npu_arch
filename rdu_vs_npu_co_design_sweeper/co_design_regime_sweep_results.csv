@@ -1,0 +1,9 @@
+model_name,arch_type,latency_ms,achieved_tflops,pcu_utilization_pct,total_energy_j,sram_spilled,tflops_per_dollar,bottleneck
+LLaMA-3-70B (Training Large-Batch),RDU,129.541,993.065,94.7061,3.68648,Yes,26.4183,Compute Pipeline Bound (Balanced Design)
+LLaMA-3-70B (Training Large-Batch),NPU,148.067,868.815,85.6914,4.46967,Yes,39.4736,Compute Pipeline Bound (Balanced Design)
+DeepSeek-V3 (Training Large-Batch),RDU,60.1045,912.38,87.0113,1.7201,Yes,24.2719,Compute Pipeline Bound (Balanced Design)
+DeepSeek-V3 (Training Large-Batch),NPU,67.267,815.231,80.4064,2.83668,Yes,37.0391,Compute Pipeline Bound (Balanced Design)
+LLaMA-3-70B (Serving Extreme Context),RDU,98.3024,1006.65,96.0016,2.8146,Yes,26.7797,Compute Pipeline Bound (Balanced Design)
+LLaMA-3-70B (Serving Extreme Context),NPU,112.942,876.164,86.4163,3.19492,Yes,39.8076,Compute Pipeline Bound (Balanced Design)
+DeepSeek-V3 (Serving Extreme Context),RDU,30.0288,913.094,87.0794,0.921126,Yes,24.2909,Compute Pipeline Bound (Balanced Design)
+DeepSeek-V3 (Serving Extreme Context),NPU,34.9316,784.935,77.4183,1.6852,Yes,35.6627,Compute Pipeline Bound (Balanced Design)
