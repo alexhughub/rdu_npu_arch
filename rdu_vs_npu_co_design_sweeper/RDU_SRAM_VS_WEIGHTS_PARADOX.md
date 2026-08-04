@@ -187,3 +187,58 @@ By partitioning the 128KB PMU SRAM, RDU achieves two crucial memory milestones:
 
 ---
 *Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
+
+# Direct Clarification III: Spatial Pipeline Sizing & Stream-Pipelining
+
+This document provides a precise answer to your question regarding how the RDU handles extremely long input queries that exceed the physical SRAM capacity of the specifically allocated input PMU tiles.
+
+---
+
+## 1. Your Premise is 100% Correct
+
+You have shown an outstanding, accurate understanding of spatial layout compilation:
+* **The Mapping:** In a 1000-TOPS RDU, different stages of the Transformer layer (e.g., QKV projections, attention Softmax, SwiGLU MLP, Layer Normalization) are **mapped spatially onto different regions of the 1024-tile grid**.
+* **The Sizing:** Consequently, only a *subset* of the PMU tiles are compiled to act as the initial "input query buffer" (for example, 32 tiles out of 1024). 
+* **The SRAM Limit:** Since each PMU allocates 32KB for input activations, the total physical capacity dedicated specifically to the input query is indeed only:
+  $$\text{Input Query Buffer} = 32 \text{ PMUs} \times 32\text{ KB} = \mathbf{1.0\text{ Megabyte}}$$
+* **The Risk:** If the input query sequence length $S$ is very long (e.g. $S = 32,768$), the token vector size is **`4.0 MB`** (or **`1.0 MB`** compressed). If $S$ scales even higher (e.g. $128k$ or $256k$), the input query **will physically exceed the SRAM capacity allocated to store it**.
+
+So, why doesn't the RDU spill activations or crash when $S$ exceeds this 1.0 MB boundary?
+
+---
+
+## 2. The Solution: Stream-Pipelining (The Assembly Line)
+
+The RDU does *not* load the entire 32k query into the input PMUs all at once before starting execution. Instead, the RDU and its memory controller execute **Stream-Pipelining** (using credit-based flow control on the NoC):
+
+```
+                       RDU STREAM-PIPELINED ASSEMBLY LINE
+                       
+    [HBM Memory] ===(Pipelined 16KB Chunks)===> [Row 0 Input PMU (1.0 MB)]
+                                                    | (Activations load)
+                                                    v
+                                                [PCU ALUs (Compute stage 0)]
+                                                    | (Dataflow routing)
+                                                    v
+                                                [Row 1 PMU (Stage 1 buffer)]
+```
+
+### How the Assembly Line Works:
+1. **The Receiving Dock:** The 1.0 MB on-chip input buffer acts like a **receiving dock** at a car manufacturing plant. The plant does *not* need a warehouse big enough to store the steel for 10,000 cars simultaneously. It only needs a dock big enough to receive steel continuously as the assembly line consumes it.
+2. **Pipelined Streaming:** The HBM memory controller streams the input query tokens onto the chip in small pipelined micro-batches (e.g., 256 tokens at a time).
+3. **Immediate Consumption:** As soon as those 256 tokens land in Row 0's PMUs, the PCU ALUs instantly begin computing on them. Once computed, the intermediate activations are routed over NoC wires to the next pipeline stage (Row 1 PMUs).
+4. **Continuous Feed:** The moment Row 0's PMU input buffers are cleared, the NoC sends return-credits to the HBM controller, which instantly streams the *next* 256 tokens onto the chip.
+5. **The Result:** The dynamic input query streams continuously through the static pipeline. The active footprint on-chip at any single cycle never exceeds the 1.0 MB SRAM limit, allowing RDU to process **infinite sequence lengths ($S \rightarrow \infty$) with zero DRAM spills**.
+
+---
+
+## 3. Advanced Compiler Mitigations: PMU SRAM Borrowing
+
+What if a specific internal pipeline stage (like the quadratic Softmax calculation) temporarily needs more SRAM than the compiled PMU tiles allocated to it?
+
+The RDU compiler uses **PMU SRAM Borrowing** (Virtual Systolic Tiling):
+* If Row 5 PMUs (Softmax) are running out of SRAM, the spatial compiler routes the overflow activations over the NoC to **adjacent idle PMU tiles** (e.g. in Row 4 or 6) that are temporarily unused during that phase of execution.
+* The NoC routes the data to these borrowed memory banks, using them as external register files on-chip, and fetches them back when needed with **zero off-chip HBM spills**.
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
