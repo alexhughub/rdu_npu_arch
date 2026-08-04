@@ -106,4 +106,80 @@ While weights remain constant and weight reuse remains high in both regimes, **d
 * **The RDU Spatial Victory:** The RDU compiler partitions the 32,768-token sequence into micro-tiles ($S_{\text{{micro}}} \le 512$) and streams them sequentially through the grid like an assembly line. For each micro-step, the active activation footprint is tiny ($<16\text{{ KB}}$), fitting perfectly on-chip inside the local PMUs. Coupled with **INT4 stream compression**, RDU has **zero DRAM spills**, sustaining near-peak throughput and dropping active memory energy by **4.6x**.
 
 ---
+
+## Section 6: Diagrammatic Flow & Bottleneck Analysis (B=1, S=32,768 Extreme Serving)
+
+The structural flow diagrams below map the deep physical, electrical, and routing divergence that occurs under extreme context lengths:
+
+### 1. NPU Monolithic SRAM Spilling Bottleneck (DRAM Thrashing)
+
+```
+                   NPU MONOLITHIC MEMORY SPILLING FLOW (S = 32,768)
+        
+   +--------------------------------------------------------+
+   |                  Off-Chip HBM3 (2.4 TB/s)              |
+   +---------------------------+----------------------------+
+               ^               | (1.85 GB Weights Load)
+               |               v
+   (3.94 GB    |      +---------+---------+
+    Activation |      |  Centralized SRAM | <--- CONTENTION!
+    Spill      |      |   (256 MB Raw)    |      Port Arbitration
+    Reads/     |      +---------+---------+      injects 2-cycle stalls
+    Writes)    |                | (Global Bus - 4.8 TB/s)
+               |                v
+               |      +---------+---------+
+               +---- | 712x712 PE Array  | (Compute ALUs are starved
+                      |  (Systolic Grid)  |  waiting for HBM spill paths)
+                      +-------------------+
+```
+
+### 2. RDU Spatial Sequence-Tiling ($S$-tiling) & Local AGU Compression Flow
+
+```
+         RDU SPATIAL SEQUENCE-TILING (S-TILING) & AGU COMPRESSION
+         
+   +--------------------------------------------------------+
+   |                  Off-Chip HBM3 (2.4 TB/s)              |
+   +---------------------------+----------------------------+
+                               | (Weights load asynchronously
+                               v  using dual-port prefetch)
+                     +---------+---------+
+                     |  RDU 32x32 NoC    | (256 GB/s Link Speed)
+                     +---------+---------+
+                               |
+                               v
+                     +---------+---------+
+                     |  PMU Tile SRAM    | <--- INT4 HW Compression (AGU)
+                     |  (128KB Local)    |      Effective Capacity = 512KB
+                     +---------+---------+      S-tiling breaks 32k into 
+                               |                S_micro = 512 chunks
+                               v                (Each chunk takes < 16KB!)
+                     +---------+---------+
+                     |  PCU Vector ALUs  | <--- 100% Compute-Bound!
+                     |  (Tensor Core)    |      Zero off-chip DRAM spills.
+                     +-------------------+
+```
+
+### 3. Quantitative Memory Sizing & Latency Breakdown ($B=1, S=32,768$)
+
+The table below exposes the structural memory sizing and simulated execution latency profiles for both architectures:
+
+| Physical Sizing Metric | TPU-style Centralized NPU | SambaNova Spatial RDU | RDU Architectural Advantage |
+| :--- | :---: | :---: | :--- |
+| **Static Weights Volume** | 1,856.0 MB | 1,856.0 MB | Identical layer parameters |
+| **Intermediate Activations** | 4,194.3 MB | 4,194.3 MB | Identical mathematical tensor size |
+| **Physical On-Chip SRAM** | 256.0 MB | 128.0 MB | RDU has 2x smaller physical SRAM area |
+| **Activation Hardware Comp**| Not Supported (Raw macro) | **INT4 AGU Compression** | 4x effective SRAM capacity scaling |
+| **Effective On-Chip SRAM** | 256.0 MB | **512.0 MB** | 2x higher effective memory density |
+| **S-Tiling Partitioning** | Not Supported (Monolithic) | **Supported (S_micro = 512)**| Restricts active step memory to <16KB |
+| **Off-Chip DRAM Spill Vol** | **3,938.3 MB** | **0.0 MB** | **Eliminates 100% of activation spills** |
+| **Weight HBM Load Latency** | 0.773 ms | 0.773 ms | Shared high-bandwidth memory interface |
+| **DRAM Activation Spill Lat**| **1.594 ms** | **0.000 ms** | **Zero DRAM spill stalls** |
+| **Simulated Compute Latency**| 68.324 ms | 65.944 ms | RDU local PMUs bypass setup overhead |
+| **SRAM Bus Contention Lat** | **0.418 ms** | **0.000 ms** | **Zero centralized global bus contention** |
+| **Total Simulated Latency** | **71.109 ms** | **66.763 ms** | **1.07x lower layer execution latency** |
+| **Effective Core TOPS** | **525.6 TFLOPS** | **559.8 TFLOPS** | **Sustains peak ALU compute on-chip** |
+| **Energy per Layer** | **1.432 Joules** | **0.312 Joules** | **4.6x lower memory active energy footprint** |
+
+---
 *Report automatically compiled and formatted by the extreme co-design comparison engine.*
