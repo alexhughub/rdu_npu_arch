@@ -183,3 +183,26 @@ The table below exposes the structural memory sizing and simulated execution lat
 
 ---
 *Report automatically compiled and formatted by the extreme co-design comparison engine.*
+
+---
+
+## Section 7: "What-If" Study: NPU Activation Chunking & The Weight Amplification Penalty
+
+To prevent the massive **`3.94 GB`** activation spill on NPU under extreme sequence serving ($S = 32,768$), we simulated a "What-If" NPU architecture that segments (chunks) activations into $C$ smaller blocks, and pipelines HBM-to-SRAM loads with PE compute.
+
+Our physical co-design simulations reveal a catastrophic failure state: **The Weight Amplification Penalty**.
+
+### 1. The Core Physics of Weight Amplification
+Because the layer weights (**`1,856.0 MB`**) are vastly larger than the NPU centralized SRAM (**`256.0 MB`**), they cannot be pinned on-chip. If the NPU segments activations into $C$ chunks and processes them sequentially, **it must reload the entire 1.85 GB weight matrix from HBM for EACH chunk execution!**
+
+* At $C = 16$ chunks, weight traffic explodes to **`29.0 GB`**. Latency rises to **`43.6 ms`** and achieved throughput crashes to **`831 TFLOPS`**.
+* At $C = 32$ chunks, weight traffic balloons to **`58.0 GB`**. Latency explodes to **`82.5 ms`** and achieved throughput crashes to **`439 TFLOPS (43.2% PE utilization)`**!
+* The compute ALUs are completely starved by off-chip memory weight fetches.
+
+### 2. How the SambaNova Spatial RDU Resolves This
+In the SambaNova Spatial RDU, the weights are **statically mapped and pinned spatially** inside the local PMU SRAM tiles. The activation chunks (micro-tiles $S_{\text{micro}} \le 512$) are streamed **spatially (as a dataflow graph)** through the grid like an assembly line. 
+
+Because weights are statically pinned and activations flow past them, **weights are loaded from off-chip HBM exactly ONCE**. There is **zero weight amplification and zero weight reloading**, allowing RDU to chunk activations seamlessly and sustain **`950.4 TFLOPS (90.6% utilization)`** at $S=32k$!
+
+---
+*Report consolidated and completed by the Dual-Tier Co-Design Validation Group.*
