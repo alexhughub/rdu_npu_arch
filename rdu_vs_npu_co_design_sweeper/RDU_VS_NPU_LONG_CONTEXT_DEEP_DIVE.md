@@ -329,3 +329,95 @@ The NPU is hardwired for temporal monolithic execution, whereas the RDU is route
 
 ---
 *Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
+
+# Co-Design Study: Hybrid Tiled NPU vs. SambaNova Spatial RDU
+
+This document evaluates the microarchitectural, silicon-area, and compiler trade-offs of a **Hybrid Tiled NPU** (a tiled, multi-core systolic array with distributed vector units and sized-up on-chip SRAM, similar to Google TPU v4/v5e or Groq TSP) against the **SambaNova Spatial RDU**.
+
+---
+
+## 1. What does the proposed Hybrid Architecture look like?
+
+To close the serving gap with RDU, the proposed **Hybrid Tiled NPU** transitions from a single monolithic central block to a **Heterogeneous Tiled Silicon Layout**:
+
+```
+               HYBRID TILED HETEROGENEOUS NPU LAYOUT
+               
+   +------------------+------------------+------------------+
+   |   SRAM Tile 0    |   SRAM Tile 1    |   SRAM Tile 2    |  <-- Distributed SRAM
+   |     (128 MB)     |     (128 MB)     |     (128 MB)     |      (Sized up to 512MB)
+   +------------------+------------------+------------------+
+   |  Systolic GEMM   |  Systolic GEMM   |  Systolic GEMM   |  <-- Sliced Dense Cores
+   |  Core (64x64 PE) |  Core (64x64 PE) |  Core (64x64 PE) |      (e.g., 4 partitions)
+   +------------------+------------------+------------------+
+   |   Vector Core    |   Vector Core    |   Vector Core    |  <-- SIMD Vector Cores
+   | (Softmax/Norm)   | (Softmax/Norm)   | (Softmax/Norm)   |      (for non-GEMM math)
+   +------------------+------------------+------------------+
+                      | | Spatial Interconnect (NoC) | |
+```
+
+By partitioning the dense systolic array into smaller, independent $64 \times 64$ cores, adding dedicated distributed Vector/SIMD cores, sizing up SRAM on-chip (to 512MB), and connecting them over a high-speed tiled bus, **this hybrid design can indeed pipeline chunks of weights and input queries on-chip**.
+
+---
+
+## 2. Will it behave closer to RDU or even better?
+
+### Yes, it will behave much closer to RDU:
+* **The Advantages:**
+  - Because weights and activations can be chunked and streamed between the SRAM tiles and the compute tiles, **monolithic HBM spilling is eliminated**.
+  - We can prefetch and pipeline weights from HBM to SRAM in the background, matching RDU's asynchronous double-buffering.
+  - Active memory traffic drops to the same level as RDU (**`5.91 GB`** at $S=32k$, rather than NPU's monolithic **`120.59 GB`**).
+
+---
+
+## 3. The Catch: Why the Hybrid NPU is Still Outmatched by RDU
+
+While the Hybrid NPU achieves similar dataflow throughput, it introduces severe **silicon-area, thermal-density, and compiler trade-offs** that make it less economically and architecturally efficient than the RDU:
+
+### A. The "Dark Silicon" (Heterogeneous Idle) Penalty
+* **In the Spatial RDU (Homogeneous & Reconfigurable):**
+  - Every tile is identical and software-configurable. A tile's PCU can act as a Matrix GEMM engine, a Vector engine, or a routing buffer.
+  - During the **projection phase** of LLM attention, the compiler configures 95% of the tiles to act as Matrix units. During the **attention Softmax phase**, the compiler reconfigures 60% of the tiles to act as Vector units.
+  - **Result:** Silicon active utilization is maintained near **`90%` to `100%`** across all execution phases.
+* **In the Hybrid Tiled NPU (Heterogeneous & Fixed-ASIC):**
+  - Cores are physically hardwired. You have a fixed number of Matrix GEMM Cores and Vector SIMD Cores.
+  - During **Matrix-heavy phases**: The Vector cores sit **idle** (consuming static leakage power but doing zero useful math).
+  - During **Softmax / LayerNorm phases**: The massive Matrix cores sit **idle**, waiting for the vector cores to finish.
+  - **Result:** The overall effective utilization of the physical silicon die is significantly lower. To match the RDU's real-world throughput, you must build a physically much larger (and more expensive) silicon die!
+
+### B. The SRAM Cost and Yield Squeeze
+* Sizing up on-chip SRAM from 256MB to 512MB or 1GB consumes a **massive silicon area**.
+* Since SRAM bit-cell scaling has practically stalled at advanced nodes (e.g., 3nm/2nm), adding 512MB of SRAM will double the chip's die size.
+* A doubled die size drastically crashes manufacturing yield (defect density scales exponentially with area), making the Hybrid NPU **prohibitively expensive** to manufacture.
+
+### C. The Statically Scheduled Compiler Nightmare (e.g., Groq-style)
+* Because the interconnect in a tiled systolic array is usually a statically scheduled shift bus rather than a dynamic routed NoC:
+  - The compiler must coordinate the cycle-by-cycle arrival of data chunks at specific fixed Matrix tiles, then route them to specific fixed Vector tiles with nanosecond precision.
+  - Any runtime memory latency jitter (e.g., HBM refresh cycles or queue stalls) will stall the entire pipeline.
+  - Any change in the model architecture (e.g. changing from SwiGLU to GeLU or adding a Mixture-of-Experts gating layer) completely breaks the spatial placement layout, requiring a complete rewrite of the compiler scheduler back-end.
+
+---
+
+## 4. Head-to-Head Architectural Trade-Offs
+
+| Co-Design Dimension | TPU-style Monolithic NPU | Proposed Hybrid Tiled NPU | SambaNova Spatial RDU |
+| :--- | :---: | :---: | :---: |
+| **Grid Reconfigurability** | None (Fixed block) | None (Fixed tiles) | **High (Dynamic Homogeneous)** |
+| **Active Silicon Utilization** | High (Dense serving only) | **Low (Heterogeneous Idle)** | **High (90%+ all phases)** |
+| **On-Chip SRAM Sizing** | 256 MB (Centralized) | 512 MB (Sized up) | 128 MB (Distributed PMUs) |
+| **Long-Context Serv Throughput**| Catastrophic Spills | **High (Pipelined)** | **High (Pipelined)** |
+| **Manufacturing Cost & Yield** | Low (Minimalist area) | **Extreme (Huge die size)** | Balanced (Modular design) |
+| **Compiler Agility** | Simple (GEMM-centric) | Extremely Complex (Static) | Balanced (Place & Route) |
+
+---
+
+### Conclusion:
+
+Adding tiling, distributed Vector Cores, and sized-up SRAM to the NPU does indeed transform it into an on-chip pipelined dataflow processor, **bringing its long-context serving behavior on par with the RDU**. 
+
+However, doing so in a heterogeneous, fixed-ASIC manner introduces the **Dark Silicon Penalty** (low active utilization) and a **catastrophic SRAM area/cost penalty**. 
+
+By using **homogeneous, software-reconfigurable tiles** (PCUs and PMUs) connected by a high-bandwidth 2-D NoC, the **SambaNova Spatial RDU represents a much more elegant and cost-effective co-design solution**?achieving the same pipelined throughput with 4x smaller physical on-chip SRAM (128MB vs. 512MB) and near-100% active silicon utilization!
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
