@@ -259,3 +259,73 @@ The table below contrasts how memory chunking affects off-chip data movement und
 
 ---
 *Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
+
+# Why the NPU PE Array Cannot Be Partitioned Spatially
+
+This document provides a precise, physical explanation of why a TPU-style systolic NPU PE array cannot be partitioned to hold weights of different layer rows simultaneously, contrasting it with the inherently partitionable design of the SambaNova Spatial RDU.
+
+---
+
+## 1. The Physical Squeeze: Hardwired Systolic vs. Routed NoC
+
+The inability of the NPU to partition its processing elements (PEs) is not a compiler limitation; it is a **physical wiring and routing constraint** on the silicon die.
+
+```
+      NPU SYSTOLIC PE ARRAY (Hardwired)           RDU SPATIAL TILE GRID (NoC Routed)
+      
+         Activations slide left-to-right                  Tiles decoupled by NoC Routers
+         [PE] ----> [PE] ----> [PE] ----> [PE]          [Tile] <=======NoC=======> [Tile]
+          |          |          |          |              ||                         ||
+          v          v          v          v              v^                         v^
+         [PE] ----> [PE] ----> [PE] ----> [PE]          [Tile] <=======NoC=======> [Tile]
+         Accumulates slide top-to-bottom
+```
+
+### A. The NPU PE Array Wiring (Systolic Lockstep)
+In a TPU-style centralized NPU:
+1. **The Minimalist Design:** To achieve its ultra-high compute density (2.18x higher TOPS/$mm^2$ than RDU), each Processing Element (PE) inside the array is stripped of all overhead. A PE contains only a multiplier, an adder, and a few registers.
+2. **Hardwired Interconnects:** The PEs are physically wired to slide data in absolute lockstep. Activations *only* flow from left to right; partial accumulations *only* flow from top to bottom.
+3. **No Intermediate Routers:** **There are no bypass muxes, switches, or packet-routing networks inside the systolic grid.** 
+4. **The Partitioning Block:** If you tried to partition a $128 \times 128$ systolic array to run Row 0 weights on the top half and Row 1 weights on the bottom half:
+   - There is no physical mechanism to route the output of the top half out of the array without passing it through the bottom half.
+   - Passing data through the bottom half would corrupt the math of the bottom half's active calculations, or introduce massive bubble delays that completely stall execution.
+   - Every single PE in the monolithic array must be dedicated to the **same matrix multiplication step** at any one cycle.
+
+---
+
+## 2. Why the RDU is Inherently Partitionable
+
+In the RDU, the unit of replication is not a single hardwired ALU. It is a **Tile** containing a fully independent PCU vector ALU and a PMU SRAM block. 
+
+These tiles are decoupled and interconnected by a **high-bandwidth 2D Network-on-Chip (NoC)**:
+* **The NoC Router:** Every tile has its own local NoC router that can route packets in any direction (North, South, East, West).
+* **Decoupled Operation:** Because of the NoC, Row 0 tiles (e.g., Tiles 0-31) can be computing a projection using Weight Chunk $W_0$, while Row 1 tiles (Tiles 32-63) are computing a projection using Weight Chunk $W_1$ completely independently.
+* **Dynamic Spatial Pipelining:** The outputs of Row 0 PMUs are packetized and routed over the NoC directly to the input buffers of Row 1. Row 0 and Row 1 operate as independent, decoupled stages of a spatial assembly line.
+
+---
+
+## 3. Summary of the Architectural Trade-Offs
+
+```
++-----------------------------------------------------------------------------------+
+|                        PHYSICAL ROUTING & PARTITIONING TRADE-OFFS                 |
++-----------------------------------+-----------------------------------------------+
+| TPU-style Centralized NPU         | SambaNova Spatial RDU                         |
++-----------------------------------+-----------------------------------------------+
+| * Interconnect:                   | * Interconnect:                               |
+|   - Hardwired 2D shift registers  |   - High-bandwidth packetized 2D NoC          |
+| * Partitioning:                   | * Partitioning:                               |
+|   - None. Monolithic lockstep     |   - High. Completely modular sub-grids        |
+| * Silicon Density:                | * Silicon Density:                            |
+|   - High. Minimalist ALU layout   |   - Moderate. Router & SRAM area overhead     |
+| * Best Suited For:                | * Best Suited For:                            |
+|   - Dense, temporal GEMM execution|   - Pipelined, spatial dataflow streaming     |
++-----------------------------------+-----------------------------------------------+
+```
+
+If you tried to add bypass muxes and routers to every PE in the NPU array to make it partitionable, you would turn the systolic array into an RDU tile grid?and you would lose the NPU's density and cost advantages. 
+
+The NPU is hardwired for temporal monolithic execution, whereas the RDU is routed for spatial decoupled dataflow.
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
