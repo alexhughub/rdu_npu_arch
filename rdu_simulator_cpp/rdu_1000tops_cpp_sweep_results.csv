@@ -1,0 +1,163 @@
+model_name,model_type,total_tiles,total_sram_mb,peak_compute_tflops,latency_ms,achieved_tflops,pcu_utilization_pct,total_energy_j,sram_spilled,pipeline_stalls,bottleneck,grid_dim,sram_per_tile_kb,compression,hbm_bandwidth_gb_s
+LLaMA-3-70B,dense,256,16,262.144,73.2376,247.714,94.4952,0.813977,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,None,1200
+DeepSeek-V3-MoE,moe,256,16,262.144,30.4684,224.98,85.823,0.426749,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,None,1200
+LLaMA-3-70B,dense,256,16,262.144,72.7865,249.249,95.0809,0.813977,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,None,2400
+DeepSeek-V3-MoE,moe,256,16,262.144,30.0809,227.878,86.9284,0.426749,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,None,2400
+LLaMA-3-70B,dense,256,16,262.144,72.5609,250.024,95.3764,0.813977,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,None,4800
+DeepSeek-V3-MoE,moe,256,16,262.144,29.8872,229.355,87.4919,0.426749,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,None,4800
+LLaMA-3-70B,dense,256,16,262.144,71.7767,252.755,96.4185,0.749123,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,FP8,1200
+DeepSeek-V3-MoE,moe,256,16,262.144,28.5181,240.366,91.6922,0.370001,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,FP8,1200
+LLaMA-3-70B,dense,256,16,262.144,71.544,253.577,96.7321,0.749123,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,FP8,2400
+DeepSeek-V3-MoE,moe,256,16,262.144,28.3218,242.032,92.3278,0.370001,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,FP8,2400
+LLaMA-3-70B,dense,256,16,262.144,71.4277,253.99,96.8896,0.749123,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,FP8,4800
+DeepSeek-V3-MoE,moe,256,16,262.144,28.2236,242.873,92.6489,0.370001,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,FP8,4800
+LLaMA-3-70B,dense,256,16,262.144,71.0462,255.354,97.4098,0.716696,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,INT4,1200
+DeepSeek-V3-MoE,moe,256,16,262.144,27.5429,248.876,94.9386,0.341628,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,INT4,1200
+LLaMA-3-70B,dense,256,16,262.144,70.9228,255.798,97.5794,0.716696,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,INT4,2400
+DeepSeek-V3-MoE,moe,256,16,262.144,27.4422,249.789,95.2871,0.341628,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,INT4,2400
+LLaMA-3-70B,dense,256,16,262.144,70.8611,256.021,97.6643,0.716696,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,64,INT4,4800
+DeepSeek-V3-MoE,moe,256,16,262.144,27.3918,250.249,95.4623,0.341628,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,64,INT4,4800
+LLaMA-3-70B,dense,256,32,262.144,73.266,247.618,94.4586,0.811158,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,None,1200
+DeepSeek-V3-MoE,moe,256,32,262.144,30.4787,224.904,85.7939,0.42393,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,None,1200
+LLaMA-3-70B,dense,256,32,262.144,72.8007,249.2,95.0623,0.811158,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,None,2400
+DeepSeek-V3-MoE,moe,256,32,262.144,30.0861,227.839,86.9135,0.42393,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,None,2400
+LLaMA-3-70B,dense,256,32,262.144,72.568,249.999,95.3671,0.811158,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,None,4800
+DeepSeek-V3-MoE,moe,256,32,262.144,29.8898,229.335,87.4843,0.42393,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,None,4800
+LLaMA-3-70B,dense,256,32,262.144,71.8051,252.655,96.3804,0.746304,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,FP8,1200
+DeepSeek-V3-MoE,moe,256,32,262.144,28.5284,240.279,91.659,0.367183,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,FP8,1200
+LLaMA-3-70B,dense,256,32,262.144,71.5582,253.527,96.7129,0.746304,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,FP8,2400
+DeepSeek-V3-MoE,moe,256,32,262.144,28.3269,241.988,92.311,0.367183,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,FP8,2400
+LLaMA-3-70B,dense,256,32,262.144,71.4348,253.965,96.88,0.746304,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,FP8,4800
+DeepSeek-V3-MoE,moe,256,32,262.144,28.2262,242.851,92.6404,0.367183,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,FP8,4800
+LLaMA-3-70B,dense,256,32,262.144,71.0746,255.252,97.3709,0.713877,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,INT4,1200
+DeepSeek-V3-MoE,moe,256,32,262.144,27.5533,248.782,94.903,0.338809,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,INT4,1200
+LLaMA-3-70B,dense,256,32,262.144,70.937,255.747,97.5598,0.713877,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,INT4,2400
+DeepSeek-V3-MoE,moe,256,32,262.144,27.4474,249.742,95.2691,0.338809,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,INT4,2400
+LLaMA-3-70B,dense,256,32,262.144,70.8682,255.996,97.6546,0.713877,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,128,INT4,4800
+DeepSeek-V3-MoE,moe,256,32,262.144,27.3944,250.225,95.4533,0.338809,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,128,INT4,4800
+LLaMA-3-70B,dense,256,64,262.144,73.1802,247.908,94.5693,0.805521,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,None,1200
+DeepSeek-V3-MoE,moe,256,64,262.144,30.411,225.404,85.9848,0.418293,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,None,1200
+LLaMA-3-70B,dense,256,64,262.144,72.7578,249.347,95.1183,0.805521,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,None,2400
+DeepSeek-V3-MoE,moe,256,64,262.144,30.0522,228.095,87.0114,0.418293,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,None,2400
+LLaMA-3-70B,dense,256,64,262.144,72.5466,250.073,95.3953,0.805521,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,None,4800
+DeepSeek-V3-MoE,moe,256,64,262.144,29.8729,229.465,87.5339,0.418293,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,None,4800
+LLaMA-3-70B,dense,256,64,262.144,71.7193,252.957,96.4956,0.740667,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,FP8,1200
+DeepSeek-V3-MoE,moe,256,64,262.144,28.4607,240.85,91.877,0.361546,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,FP8,1200
+LLaMA-3-70B,dense,256,64,262.144,71.5154,253.679,96.7708,0.740667,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,FP8,2400
+DeepSeek-V3-MoE,moe,256,64,262.144,28.2931,242.277,92.4214,0.361546,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,FP8,2400
+LLaMA-3-70B,dense,256,64,262.144,71.4134,254.041,96.909,0.740667,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,FP8,4800
+DeepSeek-V3-MoE,moe,256,64,262.144,28.2093,242.997,92.696,0.361546,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,FP8,4800
+LLaMA-3-70B,dense,256,64,262.144,70.9889,255.56,97.4885,0.70824,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,INT4,1200
+DeepSeek-V3-MoE,moe,256,64,262.144,27.4856,249.395,95.1366,0.333172,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,INT4,1200
+LLaMA-3-70B,dense,256,64,262.144,70.8941,255.902,97.6188,0.70824,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,INT4,2400
+DeepSeek-V3-MoE,moe,256,64,262.144,27.4135,250.051,95.3867,0.333172,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,INT4,2400
+LLaMA-3-70B,dense,256,64,262.144,70.8468,256.073,97.6841,0.70824,Yes,1081344,Compute Pipeline Bound (Balanced Design),16x16,256,INT4,4800
+DeepSeek-V3-MoE,moe,256,64,262.144,27.3775,250.38,95.5123,0.333172,Yes,408576,Compute Pipeline Bound (Balanced Design),16x16,256,INT4,4800
+LLaMA-3-70B,dense,1024,64,1048.58,20.4648,886.497,84.543,0.805521,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,None,1200
+DeepSeek-V3-MoE,moe,1024,64,1048.58,10.493,653.272,62.3009,0.418293,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,64,None,1200
+LLaMA-3-70B,dense,1024,64,1048.58,20.0423,905.182,86.3249,0.805521,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,None,2400
+DeepSeek-V3-MoE,moe,1024,64,1048.58,10.1342,676.4,64.5066,0.418293,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,64,None,2400
+LLaMA-3-70B,dense,1024,64,1048.58,19.8311,914.823,87.2443,0.805521,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,None,4800
+DeepSeek-V3-MoE,moe,1024,64,1048.58,9.95479,688.59,65.669,0.418293,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,64,None,4800
+LLaMA-3-70B,dense,1024,64,1048.58,19.0038,954.646,91.0421,0.740667,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,FP8,1200
+DeepSeek-V3-MoE,moe,1024,64,1048.58,8.54268,802.415,76.5242,0.361546,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,64,FP8,1200
+LLaMA-3-70B,dense,1024,64,1048.58,18.7999,965.004,92.0299,0.740667,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,FP8,2400
+DeepSeek-V3-MoE,moe,1024,64,1048.58,8.37504,818.476,78.0559,0.361546,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,64,FP8,2400
+LLaMA-3-70B,dense,1024,64,1048.58,18.6979,970.268,92.5319,0.740667,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,FP8,4800
+DeepSeek-V3-MoE,moe,1024,64,1048.58,8.29122,826.75,78.845,0.361546,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,64,FP8,4800
+LLaMA-3-70B,dense,1024,64,1048.58,18.2734,992.807,94.6814,0.70824,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,INT4,1200
+DeepSeek-V3-MoE,moe,1024,64,1048.58,7.56753,905.813,86.3851,0.333172,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,64,INT4,1200
+LLaMA-3-70B,dense,1024,64,1048.58,18.1786,997.981,95.1749,0.70824,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,INT4,2400
+DeepSeek-V3-MoE,moe,1024,64,1048.58,7.49547,914.522,87.2156,0.333172,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,64,INT4,2400
+LLaMA-3-70B,dense,1024,64,1048.58,18.1313,1000.59,95.4236,0.70824,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,64,INT4,4800
+DeepSeek-V3-MoE,moe,1024,64,1048.58,7.45943,918.939,87.6369,0.333172,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,64,INT4,4800
+LLaMA-3-70B,dense,1024,128,1048.58,20.4358,887.753,84.6627,0.794247,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,None,1200
+DeepSeek-V3-MoE,moe,1024,128,1048.58,10.446,656.213,62.5813,0.407019,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,128,None,1200
+LLaMA-3-70B,dense,1024,128,1048.58,20.0278,905.836,86.3873,0.794247,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,None,2400
+DeepSeek-V3-MoE,moe,1024,128,1048.58,10.1107,677.973,64.6566,0.407019,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,128,None,2400
+LLaMA-3-70B,dense,1024,128,1048.58,19.8239,915.157,87.2761,0.794247,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,None,4800
+DeepSeek-V3-MoE,moe,1024,128,1048.58,9.94304,689.404,65.7467,0.407019,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,128,None,4800
+LLaMA-3-70B,dense,1024,128,1048.58,18.9749,956.102,91.181,0.729393,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,FP8,1200
+DeepSeek-V3-MoE,moe,1024,128,1048.58,8.49566,806.855,76.9477,0.350271,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,128,FP8,1200
+LLaMA-3-70B,dense,1024,128,1048.58,18.7854,965.747,92.1008,0.729393,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,FP8,2400
+DeepSeek-V3-MoE,moe,1024,128,1048.58,8.35153,820.78,78.2757,0.350271,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,128,FP8,2400
+LLaMA-3-70B,dense,1024,128,1048.58,18.6906,970.643,92.5678,0.729393,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,FP8,4800
+DeepSeek-V3-MoE,moe,1024,128,1048.58,8.27947,827.924,78.957,0.350271,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,128,FP8,4800
+LLaMA-3-70B,dense,1024,128,1048.58,18.2444,994.382,94.8316,0.696966,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,INT4,1200
+DeepSeek-V3-MoE,moe,1024,128,1048.58,7.52051,911.476,86.9252,0.321898,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,128,INT4,1200
+LLaMA-3-70B,dense,1024,128,1048.58,18.1642,998.777,95.2508,0.696966,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,INT4,2400
+DeepSeek-V3-MoE,moe,1024,128,1048.58,7.47196,917.399,87.49,0.321898,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,128,INT4,2400
+LLaMA-3-70B,dense,1024,128,1048.58,18.124,1000.99,95.4617,0.696966,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,128,INT4,4800
+DeepSeek-V3-MoE,moe,1024,128,1048.58,7.44768,920.39,87.7752,0.321898,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,128,INT4,4800
+LLaMA-3-70B,dense,1024,256,1048.58,20.2354,896.546,85.5013,0.771698,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,256,None,1200
+DeepSeek-V3-MoE,moe,1024,256,1048.58,10.2636,667.872,63.6932,0.38447,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,256,None,1200
+LLaMA-3-70B,dense,1024,256,1048.58,19.9276,910.391,86.8217,0.771698,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,256,None,2400
+DeepSeek-V3-MoE,moe,1024,256,1048.58,10.0195,684.143,65.2449,0.38447,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,256,None,2400
+LLaMA-3-70B,dense,1024,256,1048.58,19.7738,917.476,87.4973,0.771698,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,256,None,4800
+DeepSeek-V3-MoE,moe,1024,256,1048.58,9.89745,692.579,66.0495,0.38447,Yes,102144,NoC Expert Routing Congestion (NoC Bandwidth Limit),32x32,256,None,4800
+LLaMA-3-70B,dense,1024,256,1048.58,18.7745,966.309,92.1544,0.706844,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,256,FP8,1200
+DeepSeek-V3-MoE,moe,1024,256,1048.58,8.3133,824.554,78.6356,0.327723,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,256,FP8,1200
+LLaMA-3-70B,dense,1024,256,1048.58,18.6852,970.927,92.5948,0.706844,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,256,FP8,2400
+DeepSeek-V3-MoE,moe,1024,256,1048.58,8.26035,829.84,79.1397,0.327723,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,256,FP8,2400
+LLaMA-3-70B,dense,1024,256,1048.58,18.6405,973.253,92.8166,0.706844,Yes,270336,Compute Pipeline Bound (Balanced Design),32x32,256,FP8,4800
+DeepSeek-V3-MoE,moe,1024,256,1048.58,8.23388,832.508,79.3941,0.327723,Yes,102144,Compute Pipeline Bound (Balanced Design),32x32,256,FP8,4800
+LLaMA-3-70B,dense,1024,256,1048.58,18.1314,1000.58,95.4229,0.687302,No,270336,Compute Pipeline Bound (Balanced Design),32x32,256,INT4,1200
+DeepSeek-V3-MoE,moe,1024,256,1048.58,7.45284,919.752,87.7144,0.316261,No,102144,Compute Pipeline Bound (Balanced Design),32x32,256,INT4,1200
+LLaMA-3-70B,dense,1024,256,1048.58,18.1076,1001.89,95.5481,0.687302,No,270336,Compute Pipeline Bound (Balanced Design),32x32,256,INT4,2400
+DeepSeek-V3-MoE,moe,1024,256,1048.58,7.43812,921.572,87.888,0.316261,No,102144,Compute Pipeline Bound (Balanced Design),32x32,256,INT4,2400
+LLaMA-3-70B,dense,1024,256,1048.58,18.0958,1002.55,95.6108,0.687302,No,270336,Compute Pipeline Bound (Balanced Design),32x32,256,INT4,4800
+DeepSeek-V3-MoE,moe,1024,256,1048.58,7.43076,922.485,87.975,0.316261,No,102144,Compute Pipeline Bound (Balanced Design),32x32,256,INT4,4800
+LLaMA-3-70B,dense,2304,144,2359.3,10.6071,1710.36,72.4947,0.791428,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,None,1200
+DeepSeek-V3-MoE,moe,2304,144,2359.3,6.70889,1021.74,43.3072,0.4042,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,None,1200
+LLaMA-3-70B,dense,2304,144,2359.3,10.2324,1772.99,75.149,0.791428,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,None,2400
+DeepSeek-V3-MoE,moe,2304,144,2359.3,6.39789,1071.41,45.4123,0.4042,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,None,2400
+LLaMA-3-70B,dense,2304,144,2359.3,10.0451,1806.05,76.5504,0.791428,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,None,4800
+DeepSeek-V3-MoE,moe,2304,144,2359.3,6.24239,1098.1,46.5435,0.4042,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,None,4800
+LLaMA-3-70B,dense,2304,144,2359.3,9.14616,1983.56,84.0742,0.726574,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,FP8,1200
+DeepSeek-V3-MoE,moe,2304,144,2359.3,4.75859,1440.5,61.0565,0.347453,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,FP8,1200
+LLaMA-3-70B,dense,2304,144,2359.3,8.98997,2018.02,85.5349,0.726574,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,FP8,2400
+DeepSeek-V3-MoE,moe,2304,144,2359.3,4.63874,1477.72,62.634,0.347453,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,FP8,2400
+LLaMA-3-70B,dense,2304,144,2359.3,8.91187,2035.71,86.2845,0.726574,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,FP8,4800
+DeepSeek-V3-MoE,moe,2304,144,2359.3,4.57882,1497.06,63.4537,0.347453,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,FP8,4800
+LLaMA-3-70B,dense,2304,144,2359.3,8.41571,2155.72,91.3715,0.694147,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,INT4,1200
+DeepSeek-V3-MoE,moe,2304,144,2359.3,3.78345,1811.78,76.7932,0.319079,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,INT4,1200
+LLaMA-3-70B,dense,2304,144,2359.3,8.36874,2167.82,91.8843,0.694147,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,INT4,2400
+DeepSeek-V3-MoE,moe,2304,144,2359.3,3.75917,1823.48,77.2892,0.319079,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,INT4,2400
+LLaMA-3-70B,dense,2304,144,2359.3,8.34525,2173.92,92.1429,0.694147,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,64,INT4,4800
+DeepSeek-V3-MoE,moe,2304,144,2359.3,3.74703,1829.39,77.5395,0.319079,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,64,INT4,4800
+LLaMA-3-70B,dense,2304,288,2359.3,10.4825,1730.68,73.3558,0.766061,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,128,None,1200
+DeepSeek-V3-MoE,moe,2304,288,2359.3,6.56629,1043.93,44.2476,0.378833,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,None,1200
+LLaMA-3-70B,dense,2304,288,2359.3,10.1702,1783.84,75.609,0.766061,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,128,None,2400
+DeepSeek-V3-MoE,moe,2304,288,2359.3,6.32659,1083.48,45.9241,0.378833,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,None,2400
+LLaMA-3-70B,dense,2304,288,2359.3,10.014,1811.66,76.7883,0.766061,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,128,None,4800
+DeepSeek-V3-MoE,moe,2304,288,2359.3,6.20674,1104.41,46.8109,0.378833,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,None,4800
+LLaMA-3-70B,dense,2304,288,2359.3,9.02164,2010.94,85.2346,0.701207,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,128,FP8,1200
+DeepSeek-V3-MoE,moe,2304,288,2359.3,4.616,1485,62.9426,0.322086,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,FP8,1200
+LLaMA-3-70B,dense,2304,288,2359.3,8.92771,2032.09,86.1314,0.701207,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,128,FP8,2400
+DeepSeek-V3-MoE,moe,2304,288,2359.3,4.56745,1500.79,63.6117,0.322086,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,FP8,2400
+LLaMA-3-70B,dense,2304,288,2359.3,8.88074,2042.84,86.5869,0.701207,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,128,FP8,4800
+DeepSeek-V3-MoE,moe,2304,288,2359.3,4.54317,1508.81,63.9516,0.322086,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,FP8,4800
+LLaMA-3-70B,dense,2304,288,2359.3,8.4168,2155.44,91.3596,0.687302,No,120150,Compute Pipeline Bound (Balanced Design),48x48,128,INT4,1200
+DeepSeek-V3-MoE,moe,2304,288,2359.3,3.79377,1806.85,76.5842,0.316261,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,INT4,1200
+LLaMA-3-70B,dense,2304,288,2359.3,8.36928,2167.68,91.8783,0.687302,No,120150,Compute Pipeline Bound (Balanced Design),48x48,128,INT4,2400
+DeepSeek-V3-MoE,moe,2304,288,2359.3,3.76433,1820.98,77.1832,0.316261,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,INT4,2400
+LLaMA-3-70B,dense,2304,288,2359.3,8.34553,2173.85,92.1399,0.687302,No,120150,Compute Pipeline Bound (Balanced Design),48x48,128,INT4,4800
+DeepSeek-V3-MoE,moe,2304,288,2359.3,3.74961,1828.13,77.4862,0.316261,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,128,INT4,4800
+LLaMA-3-70B,dense,2304,576,2359.3,10.091,1797.84,76.2024,0.715327,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,256,None,1200
+DeepSeek-V3-MoE,moe,2304,576,2359.3,6.19279,1106.89,46.9163,0.328099,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,None,1200
+LLaMA-3-70B,dense,2304,576,2359.3,9.97437,1818.86,77.0932,0.715327,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,256,None,2400
+DeepSeek-V3-MoE,moe,2304,576,2359.3,6.13984,1116.44,47.3209,0.328099,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,None,2400
+LLaMA-3-70B,dense,2304,576,2359.3,9.91607,1829.55,77.5464,0.715327,Yes,120150,Compute Pipeline Bound (Balanced Design),48x48,256,None,4800
+DeepSeek-V3-MoE,moe,2304,576,2359.3,6.11337,1121.28,47.5259,0.328099,Yes,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,None,4800
+LLaMA-3-70B,dense,2304,576,2359.3,8.88128,2042.72,86.5816,0.687517,No,120150,Compute Pipeline Bound (Balanced Design),48x48,256,FP8,1200
+DeepSeek-V3-MoE,moe,2304,576,2359.3,4.54833,1507.1,63.879,0.316448,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,FP8,1200
+LLaMA-3-70B,dense,2304,576,2359.3,8.85753,2048.19,86.8138,0.687517,No,120150,Compute Pipeline Bound (Balanced Design),48x48,256,FP8,2400
+DeepSeek-V3-MoE,moe,2304,576,2359.3,4.53361,1511.99,64.0864,0.316448,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,FP8,2400
+LLaMA-3-70B,dense,2304,576,2359.3,8.84565,2050.95,86.9304,0.687517,No,120150,Compute Pipeline Bound (Balanced Design),48x48,256,FP8,4800
+DeepSeek-V3-MoE,moe,2304,576,2359.3,4.52625,1514.45,64.1906,0.316448,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,FP8,4800
+LLaMA-3-70B,dense,2304,576,2359.3,8.36928,2167.68,91.8783,0.687302,No,120150,Compute Pipeline Bound (Balanced Design),48x48,256,INT4,1200
+DeepSeek-V3-MoE,moe,2304,576,2359.3,3.76433,1820.98,77.1832,0.316261,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,INT4,1200
+LLaMA-3-70B,dense,2304,576,2359.3,8.34553,2173.85,92.1399,0.687302,No,120150,Compute Pipeline Bound (Balanced Design),48x48,256,INT4,2400
+DeepSeek-V3-MoE,moe,2304,576,2359.3,3.74961,1828.13,77.4862,0.316261,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,INT4,2400
+LLaMA-3-70B,dense,2304,576,2359.3,8.33365,2176.95,92.2712,0.687302,No,120150,Compute Pipeline Bound (Balanced Design),48x48,256,INT4,4800
+DeepSeek-V3-MoE,moe,2304,576,2359.3,3.74225,1831.72,77.6385,0.316261,No,45398,NoC Expert Routing Congestion (NoC Bandwidth Limit),48x48,256,INT4,4800
