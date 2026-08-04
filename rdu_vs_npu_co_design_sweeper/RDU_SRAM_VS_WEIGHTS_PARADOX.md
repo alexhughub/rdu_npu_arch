@@ -242,3 +242,67 @@ The RDU compiler uses **PMU SRAM Borrowing** (Virtual Systolic Tiling):
 
 ---
 *Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
+
+# Direct Clarification IV: 400K Context Sizing & Chunking Mathematics
+
+This document provides the exact, concrete mathematical calculation for streaming a **400K sequence context** through the 32 PMUs of our 1000-TOPS RDU design running LLaMA-3-70B.
+
+---
+
+## 1. Sizing the 400K Input Query (LLaMA-3-70B)
+
+* **Sequence Length ($S$):** $400,000$ tokens.
+* **Hidden Dimension ($H_{\text{in}}$):** $8,192$ elements.
+* **FP16 Precision Sizing:** 2 bytes per element.
+
+The physical size of the uncompressed 400K input query tensor is:
+$$\text{Query Size} = S \times H_{\text{in}} \times \text{bytes} = 400,000 \times 8,192 \times 2 \text{ bytes} = 6,553,600,000 \text{ Bytes}$$
+$$\text{Query Size in Megabytes} = \frac{6,553,600,000}{1,048,576} \approx \mathbf{6,250.0\text{ Megabytes (6.25 GB)}}$$
+
+---
+
+## 2. Sizing the Mapped 32 PMU Input Buffer
+
+* We have **32 PMU tiles** compiled to hold the input query.
+* Each PMU has **32 KB** of SRAM allocated specifically for input activations.
+
+The total physical on-chip input buffer capacity is:
+$$\text{Input Buffer Capacity} = 32 \text{ PMUs} \times 32\text{ KB} = 1,024 \text{ KB} = \mathbf{1.0\text{ Megabyte}}$$
+
+---
+
+## 3. Resolving the Math Problem: How many chunks are needed?
+
+To stream a **6.25 GB** input query through a **1.0 MB** on-chip buffer without overflowing, the query must be segmented into chunks that are less than or equal to the 1.0 MB capacity:
+$$\text{Chunk Size} \le 1.0\text{ Megabyte (1,048,576 Bytes)}$$
+
+Let's calculate the exact number of chunks required for both the **Compressed (INT4)** and **Uncompressed (FP16)** cases:
+
+### Case A: Under INT4 Hardware AGU Compression (4x Sizing Reduction)
+Under INT4 compression, each activation element takes only 0.5 bytes (4 bits).
+
+1. **Bytes per compressed token:**
+   $$\text{Bytes/Token} = 8,192 \text{ (hidden dim)} \times 0.5 \text{ Bytes} = \mathbf{4,096\text{ Bytes/token}}$$
+2. **Maximum tokens that can fit in the 1.0 MB SRAM buffer simultaneously:**
+   $$\text{Max Tokens} = \frac{1,048,576 \text{ Bytes}}{4,096 \text{ Bytes/token}} = \mathbf{256\text{ tokens per chunk}}$$
+3. **Number of chunks ($C$) required to stream the 400,000 token sequence:**
+   $$C = \frac{\text{Total Tokens}}{\text{Tokens per Chunk}} = \frac{400,000}{256} = \mathbf{1,562.5\text{ chunks}}$$
+
+* **The INT4 Answer:** Under RDU's INT4 compression, the 400K query must be partitioned into **1,563 sequential chunks of 256 tokens each**!
+
+---
+
+### Case B: Under Uncompressed FP16 (No Compression)
+Under uncompressed FP16 representation, each activation element takes 2.0 bytes.
+
+1. **Bytes per FP16 token:**
+   $$\text{Bytes/Token} = 8,192 \text{ (hidden dim)} \times 2.0 \text{ Bytes} = \mathbf{16,384\text{ Bytes/token}}$$
+2. **Maximum tokens that can fit in the 1.0 MB SRAM buffer simultaneously:**
+   $$\text{Max Tokens} = \frac{1,048,576 \text{ Bytes}}{16,384 \text{ Bytes/token}} = \mathbf{64\text{ tokens per chunk}}$$
+3. **Number of chunks ($C$) required to stream the 400,000 token sequence:**
+   $$C = \frac{\text{Total Tokens}}{\text{Tokens per Chunk}} = \frac{400,000}{64} = \mathbf{6,250\text{ chunks}}$$
+
+* **The FP16 Answer:** Without activation compression, the 400K query must be partitioned into **6,250 sequential chunks of 64 tokens each**!
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
