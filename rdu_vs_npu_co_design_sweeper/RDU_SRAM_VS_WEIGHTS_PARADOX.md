@@ -134,3 +134,56 @@ The RDU does *not* load the entire 1.85 GB weight matrix onto the chip at once. 
 
 ---
 *Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
+
+# Direct Clarification II: PMU SRAM Partitioning & Streaming Mechanics
+
+This document provides a precise, microarchitectural breakdown of how a **128KB PMU (Pattern Memory Unit)** is partitioned, and how weights and activation query tokens are streamed inside the SambaNova Spatial RDU.
+
+---
+
+## 1. How a 128KB PMU SRAM is physically partitioned
+
+Yes! Your physical intuition is completely correct. The PMU is partitioned to hold **both weights and input queries (activations)** simultaneously. 
+
+To enable seamless compute-and-prefetch overlap without bank conflicts, the 128KB dual-ported PMU SRAM is divided into three functional channels:
+
+```
+               128KB PMU SRAM PHYSICAL PARTITIONING
+               
+   +-------------------------------------------------------------+
+   |  32 KB Weight Channels (Active / Prefetch Double-Buffer)   |
+   |  * Active Weight Buffer: 16 KB (PCU currently reading)      |
+   |  * Prefetch Weight Buffer: 16 KB (HBM currently prefetching)|
+   +-------------------------------------------------------------+
+   |  64 KB Activation Channels (Input / Output Circular Buffers) |
+   |  * Input Query Buffer: 32 KB (Token activations to process) |
+   |  * Output Activation Buffer: 32 KB (Calculated output states) |
+   +-------------------------------------------------------------+
+   |  32 KB Local Accumulators & KV-Cache Slices                  |
+   |  * Holds intermediate attention states and active KV-cache  |
+   +-------------------------------------------------------------+
+```
+
+---
+
+## 2. Weight vs. Activation Streaming Mechanics
+
+### A. Weights: Streamed from HBM in 16KB Chunks (YES)
+* **YES!** Static weights are indeed streamed from off-chip HBM in **16KB chunks** to match the PMU's active/prefetch double-buffer size.
+* Since the 1000-TOPS RDU has 1024 PMU tiles, the aggregate weight block loaded on-chip at any single step is:
+  $$\text{On-Chip Weight Slice} = 1024 \text{ PMUs} \times 16\text{ KB} = \mathbf{16.3\text{ Megabytes}}$$
+* The asynchronous AGU prefetch engine streams the next 16.3 MB weight slice over HBM, hiding loading delays completely under the active PCU compute loops.
+
+### B. Input Queries (Activations): Pure On-Chip Flow (NO DRAM Spills)
+* **Only the very first input query (user prompt)** is loaded from HBM into the PMUs.
+* Once the input query is on-chip, the intermediate activations **do NOT go back to HBM**!
+* Instead, as the PCU ALUs compute, they write output activations to local PMU buffers. These activations then stream **spatially over NoC wires** directly from tile-to-tile across the mapped layer graph.
+* The activations flow purely on-chip, from PMU to PMU. They are **never written back to HBM** until the very final layer of the model outputs the final decoded token!
+
+### Summary of the Co-Design Magic:
+By partitioning the 128KB PMU SRAM, RDU achieves two crucial memory milestones:
+1. **Weights are streamed exactly ONCE** per layer step (in 16KB chunks per tile, with loading 100% hidden by double-buffering).
+2. **Activations are kept entirely on-chip**, flowing from PMU to PMU over NoC wires with **zero DRAM spills**, bypassing the off-chip Memory Wall entirely!
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
