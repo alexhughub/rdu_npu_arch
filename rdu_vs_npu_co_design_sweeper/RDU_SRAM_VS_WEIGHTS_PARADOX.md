@@ -306,3 +306,80 @@ Under uncompressed FP16 representation, each activation element takes 2.0 bytes.
 
 ---
 *Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
+
+# Microarchitectural Deep-Dive: Hidden Dimension & Bytes-per-Token Physics
+
+This document provides an intuitive and mathematically exact explanation of what the **Hidden Dimension** is and how it dictates the physical **Bytes per Token** footprint inside silicon memory systems.
+
+---
+
+## 1. What does "Hidden Dimension" mean?
+
+In a Large Language Model (LLM) like LLaMA-3, a **token** (which represents a word or sub-word piece) is not processed as a single character or raw text. Instead, it is represented inside the neural network as a **high-dimensional vector of floating-point numbers**.
+
+* This vector is called the **Token Embedding Vector**.
+* The length of this vector (the number of independent numbers/dimensions inside it) is the **Hidden Dimension (denoted as $D_{\text{hidden}}$ or $d_{\text{model}}$)**.
+
+In simple terms, **the Hidden Dimension is the width of the data pipeline for a single token**. It represents how much semantic, syntactic, and contextual information the model can carry for each word piece as it flows through the network layers:
+
+```
+               SINGLE TOKEN EMBEDDING VECTOR (LLaMA-3-70B)
+               
+  Token: "Silicon" ===> [ x_0, x_1, x_2, x_3, ..., x_8191 ]
+                       |<-------- 8,192 elements -------->|
+                       |<------- Hidden Dimension ------->|
+```
+
+### Representative Hidden Dimensions:
+* **LLaMA-3-8B:** $D_{\text{hidden}} = 4,096$ elements per token.
+* **LLaMA-3-70B:** $D_{\text{hidden}} = 8,192$ elements per token.
+* **DeepSeek-V3:** $D_{\text{hidden}} = 7,168$ elements per token.
+
+---
+
+## 2. How does the Hidden Dimension impact the "Bytes per Token"?
+
+When a token passes through a layer of the network, its embedding vector must be physically loaded, stored, and moved inside the silicon memory (PMU SRAMs). 
+
+Since the vector contains $D_{\text{hidden}}$ independent elements, the **total physical bytes required to represent a single token** depends directly on the Hidden Dimension and the **Precision (datatype sizing)**:
+
+$$\text{Bytes per Token} = D_{\text{hidden}} \times \text{Bytes per Element (Datatype Sizing)}$$
+
+Let's calculate the physical **Bytes per Token** for LLaMA-3-70B ($D_{\text{hidden}} = 8,192$) under different precisions:
+
+### A. Under Standard FP16/BF16 Precision (Uncompressed)
+* FP16 and BF16 store each floating-point element using 16 bits of memory.
+* 16 bits = **`2.0 Bytes`** per element.
+* **Bytes per Token Calculation:**
+  $$\text{Bytes per Token} = 8,192 \text{ elements} \times 2.0\text{ bytes} = \mathbf{16,384 \text{ Bytes (16.0 KB per token)}}$$
+* *To store just a single token at standard uncompressed precision takes exactly 16 Kilobytes of SRAM!*
+
+### B. Under FP8 Precision (Half-Precision Compression)
+* FP8 stores each floating-point element using 8 bits of memory.
+* 8 bits = **`1.0 Byte`** per element.
+* **Bytes per Token Calculation:**
+  $$\text{Bytes per Token} = 8,192 \text{ elements} \times 1.0\text{ byte} = \mathbf{8,192 \text{ Bytes (8.0 KB per token)}}$$
+
+### C. Under INT4 Sizing (AGU Hardware Compression)
+* INT4 stores each integer element using 4 bits of memory.
+* 4 bits = **`0.5 Bytes`** per element.
+* **Bytes per Token Calculation:**
+  $$\text{Bytes per Token} = 8,192 \text{ elements} \times 0.5\text{ bytes} = \mathbf{4,096 \text{ Bytes (4.0 KB per token)}}$$
+* *INT4 hardware compression reduces the on-chip memory footprint of each token by 4x, dropping it from 16KB down to just 4KB!*
+
+---
+
+## 3. Physical Silicon Sizing Slices (S = 512 vs. S = 32,768)
+
+Now we can see exactly why sequence length dictates whether activations fit in the RDU's local PMUs:
+
+1. **At Sequence Length $S = 512$ (Standard serving):**
+   * Total uncompressed activation bytes = $512 \text{ tokens} \times 16\text{ KB/token} = \mathbf{8.19\text{ Megabytes}}$.
+   * This fits easily on-chip in any accelerator.
+2. **At Sequence Length $S = 32,768$ (Extreme serving):**
+   * Total uncompressed activation bytes = $32,768 \text{ tokens} \times 16\text{ KB/token} = \mathbf{524.28\text{ Megabytes (0.52 GB)}}$!
+   * *Under RDU's INT4 AGU compression (4.0 KB/token), this footprint is slashed to just **131.0 Megabytes**, which fits easily on-chip over the grid PMUs!*
+   * *For the NPU (which has no hardware compression), the raw uncompressed activations overflow its available central SRAM double-buffers, forcing catastrophic off-chip spills.*
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
