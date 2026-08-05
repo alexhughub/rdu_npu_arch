@@ -194,3 +194,86 @@ To maximize RDU Tensor Parallel scaling, RTL designers must implement the follow
 
 ---
 *Report compiled, simulated, and finalized by the Dual-Tier Co-Design Validation Group.*
+
+# Microarchitectural Deep-Dive: Sockets, Chips, and Inter-Socket NoC Scaling
+
+This document provides a precise, physical explanation of what **Multiple Sockets** means under Tensor Parallelism (TP), and how the inter-socket routing mechanics of the **SambaNova Spatial RDU** compare to the **NPU/GPU** paradigms.
+
+---
+
+## 1. What does "Multiple Sockets" mean?
+
+In hardware engineering and system architecture, a **"socket"** corresponds directly to a **single physical chip (packaged silicon die)** installed in a socket receptacle on a motherboard.
+
+Therefore:
+* **1 Socket = 1 Physical RDU Chip** (containing 1,024 homogeneous PCU/PMU tiles).
+* **8 Sockets = 8 Physical RDU Chips** mounted on the same board (or adjacent boards in a server chassis) and physically wired together.
+
+---
+
+## 2. How Multiple Sockets are Connected: RDU vs. NPU
+
+To execute **Tensor Parallelism (TP=8)**, the model layers are sliced across the 8 physical chips. Sockets must transmit their intermediate activation states to each other to perform the All-Reduce summation. 
+
+How these sockets are physically interconnected represents a massive microarchitectural divergence:
+
+```
+    RDU UNIFIED NOC SCALING (TP=8 Sockets)          NPU DISCRETE NVLINK SCALING (TP=8)
+    
+     RDU 0 NoC Link     RDU 1 NoC Link              NPU 0 Central Bus     NPU 1 Central Bus
+     [ Tile Grid ] <===> [ Tile Grid ]              [Systolic Array]      [Systolic Array]
+          ||                 ||                            ||                    ||
+          v                  v                             v                     v
+     =================================              +--------------+      +--------------+
+           Unified Spatial NoC                      | HBM/PHY Ctrl |      | HBM/PHY Ctrl |
+      Direct Tile-to-Tile Packet Flow               +--------------+      +--------------+
+      (1.0 us Transceiver Latency)                         ||                    ||
+                                                           v                     v
+                                                    ======================================
+                                                          Discrete NVLink/PCIe Switch
+                                                    Protocol Translation (1.8 us Latency)
+```
+
+### A. The RDU Paradigm: Unified Spatial NoC Extension
+In a SambaNova multi-socket system:
+1. **The Physical Wiring:** Sockets are interconnected via high-speed, board-level copper traces or custom inter-socket cabled links (delivering **`150 GB/s`** bandwidth per link).
+2. **Unified Routing Mesh:** These physical links **directly extend the internal 2D Network-on-Chip (NoC)** from Chip A to Chip B.
+3. **The Compiler View:** The spatial compiler does not see 8 separate, discrete computers. Instead, it treats the 8 physical sockets as a **single, massive, unified 2-D Dataflow Grid containing $8 \times 1024 = 8,192$ homogeneous tiles!**
+4. **Zero-Overhead Routing:** Data flows directly from the NoC of Socket 0 to the NoC of Socket 1 with **zero protocol translation or memory bus handshaking overhead**. This is why RDU's inter-socket All-Reduce latency is so fast (**`1.0 µs`**).
+
+### B. The NPU/GPU Paradigm: Discrete Bus Bridging
+In an NPU (or GPU) system:
+1. **The Physical Wiring:** Sockets (e.g., 8 NVIDIA H100s or TPU chips) are connected over high-speed board-level interfaces like **NVLink** or **PCIe switches** (delivering **`100 GB/s`** bandwidth).
+2. **Discrete Domains:** Each NPU socket has its own closed, centralized memory bus. The internal compute engines (systolic arrays) cannot directly talk to each other.
+3. **The Protocol Translation Overhead:** To perform an All-Reduce, activations must be:
+   * Read from the systolic registers.
+   * Moved across the centralized on-chip bus to the local memory controller.
+   * Packetized and translated into NVLink/PCIe protocol frames.
+   * Transmitted over the external board-level bus to the adjacent chip.
+   * Unpacketized, translated back, and loaded into the systolic registers of the destination chip.
+4. **The Latency Penalty:** This multi-step bridging process injects substantial protocol translation, arbitration, and buffer handshaking latency (**`1.8 µs to 2.5 µs`**).
+
+---
+
+## 3. Structural Summary
+
+```
++-----------------------------------------------------------------------------------+
+|                        MULTI-SOCKET SCALING COMPARISON                            |
++-----------------------------------+-----------------------------------------------+
+| NPU NVLink/PCIe Paradigm          | SambaNova Spatial NoC Paradigm                |
++-----------------------------------+-----------------------------------------------+
+| * System Topology:                | * System Topology:                            |
+|   - Grid of discrete, independent |   - Unified, seamless 2D spatial NoC mesh     |
+|     accelerators                  |     stretching across all sockets             |
+| * Programming Model:              | * Programming Model:                          |
+|   - Message Passing (MPI / NCCL)  |   - Single massive Dataflow Graph (8192 Tiles)|
+| * Inter-socket Latency:           | * Inter-socket Latency:                       |
+|   - Logically high (1.8 - 2.5 us) |   - Ultra-low (1.0 us tile-to-tile hops)      |
+| * Scalability Bottleneck:         | * Scalability Bottleneck:                     |
+|   - CPU/Host arbitration overhead |   - Physical board trace layout boundaries    |
++-----------------------------------+-----------------------------------------------+
+```
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
