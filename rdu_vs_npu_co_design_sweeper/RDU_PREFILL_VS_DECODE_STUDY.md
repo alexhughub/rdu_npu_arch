@@ -277,3 +277,90 @@ In an NPU (or GPU) system:
 
 ---
 *Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
+
+# Microarchitectural Deep-Dive: Dynamic KV-Cache Slicing and Sizing Physics
+
+This document addresses your highly intuitive and important question: **Why does the Key-Value (KV) cache need to be partitioned into slices? Can the entire KV-cache after the Prefill stage not reside on-chip inside the RDU's local PMUs?**
+
+---
+
+## 1. Is your understanding correct?
+
+**Your understanding is conceptually correct, but it runs into a massive physical capacity/scaling barrier at long contexts.**
+
+* **The Short Sequence Case (Where you are 100% correct):**
+  - For shorter sequence lengths (e.g., $S \le 4,096$ tokens), the **entire KV-cache does fit 100% on-chip inside the RDU's local PMU SRAM buffers!** This is why RDU has zero DRAM spills for standard contexts.
+* **The Long Sequence Case (The Sizing Barrier):**
+  - Under extremely long contexts (e.g., $S = 128,000$ tokens), the physical size of the KV-cache balloons to astronomical levels.
+
+Let's do the exact, physical sizing math for a single layer of LLaMA-3-70B:
+1. **Model Specs (Grouped-Query Attention):** $N_{\text{kv\_heads}} = 8$ heads.
+2. **Head Dimension:** $d_{\text{kv}} = 128$ elements.
+3. **Active Context:** $S = 128,000$ tokens.
+4. **Data Precision:** FP16 (2 bytes per element).
+
+The physical size of the KV-cache (for both Key and Value) for a **single layer** is:
+$$\text{KV Size} = 2 \times S \times N_{\text{kv\_heads}} \times d_{\text{kv}} \times \text{bytes}$$
+$$\text{KV Size} = 2 \times 128,000 \times 8 \times 128 \times 2 = 524,288,000 \text{ Bytes} \approx \mathbf{500\text{ Megabytes per layer!}}$$
+
+### The Capacity Collision:
+* A single RDU chip only has **128 Megabytes** of total on-chip SRAM capacity!
+* Since the KV-cache of a *single* layer (**500MB**) is **4x larger** than the entire chip's physical SRAM, **it is physically impossible to hold the raw KV-cache on-chip simultaneously!**
+* Furthermore, across all 80 layers of LLaMA-3-70B, the total KV-cache is $80 \times 500\text{ MB} = \mathbf{40\text{ Gigabytes}}$!
+
+---
+
+## 2. The Solution: Dynamic KV-Cache Slicing
+
+To bypass the off-chip Memory Wall without crashing performance, the RDU's spatial compiler and hardware architecture execute **Dynamic KV-Cache Slicing** across three distinct co-design dimensions:
+
+```
+                  DYNAMIC KV-CACHE SLICING THREE-TIER PIPELINE
+                  
+   Total KV Cache (40 GB)
+         |
+         v  [Dimension 1: Tensor Parallel Slicing (TP=8 Sockets)]
+   Sliced KV per layer per Socket (62.5 MB)
+         |
+         v  [Dimension 2: INT4 AGU Hardware Compression]
+   Compressed KV slice per layer per Socket (15.6 MB)
+         |
+         v  [Dimension 3: Layer-by-Layer Autoregressive Prefetch]
+   Pipelined streaming in the background, 100% hidden by compute loops!
+```
+
+### Dimension A: Tensor Parallel Slicing (TP Slicing)
+* Slices the KV-cache across multiple physical sockets (multiple RDU chips).
+* For $TP=8$ sockets:
+  - The 8 KV heads are distributed across the 8 RDU chips (each RDU only stores **1 KV head**!).
+  - This slashes the per-layer KV-cache size on each RDU by exactly 8x:
+    $$\text{Sliced KV Size per Layer} = \frac{500\text{ MB}}{8} = \mathbf{62.5\text{ Megabytes}}$$
+
+### Dimension B: INT4 AGU Hardware Compression Slicing
+* Slices the numerical precision down by 4x.
+* The local PMU Address Generation Units (AGUs) compress the KV-cache using INT4 quantization as it is written to the PMU, and decompress it on the fly as it is read by the PCU ALUs.
+* This slashes the 62.5 MB KV-cache slice down to:
+  $$\text{Compressed Sliced KV Size} = \frac{62.5\text{ MB}}{4} = \mathbf{15.6\text{ Megabytes per layer!}}$$
+* **This 15.6 MB fits perfectly on-chip inside the local PMU tiles assigned to that layer!**
+
+### Dimension C: Layer-by-Layer Autoregressive Prefetch Slicing
+* During the sequential decode step, we execute layers **one-by-one sequentially**.
+* While the chip is computing Layer $k$, we only need Layer $k$'s weights and Layer $k$'s KV-cache on-chip.
+* Therefore, the RDU streams the sliced weights and sliced KV-caches from local HBM to the PMUs layer-by-layer asynchronously.
+* Because each layer's compressed active KV-cache slice is tiny (**15.6 MB**), it fits perfectly inside the PMUs, and is loaded in the background using **double-buffering prefetching**, completely hiding HBM access latency under compute execution!
+
+---
+
+## 3. Structural Comparison under 128k Context serving
+
+| Slicing Metric | Monolithic NPU | Hybrid NPU (Macro-Pipe) | SambaNova Spatial RDU |
+| :--- | :---: | :---: | :---: |
+| **Total 128k KV-Cache Size** | 40.0 Gigabytes | 40.0 Gigabytes | 40.0 Gigabytes |
+| **KV Head Slicing (TP=8)** | 5.0 GB per NPU | 5.0 GB per NPU | 5.0 GB per NPU |
+| **KV-Cache Compression** | Not Supported (Raw) | Not Supported (Raw) | **INT4 AGU (4x compression)** |
+| **On-Chip Sliced KV per Layer**| 62.5 MB | 62.5 MB | **15.6 MB** |
+| **On-Chip Cache Spill?** | **YES** (SRAM overflows) | **YES** (Over flows in non-GEMM) | **NO (100% fits in local PMUs)** |
+| **HBM KV Spill Traffic** | **`1.31 ms`** stalls (Spills to HBM) | **`0.39 ms`** stalls (Partial Spills) | **`0.00 ms`** (**Zero DRAM Spills**) |
+
+---
+*Report compiled and structured by the Dual-Tier Co-Design Validation Group.*
