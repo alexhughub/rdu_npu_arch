@@ -8,9 +8,9 @@
 
 ## 1. Master SoC Architecture Overview
 
-This robotics-optimized System-on-Chip (SoC) is designed specifically for real-time AI control loop processing in humanoid robots. It completely bypasses expensive, power-hungry HBM interfaces in favor of low-cost, highly efficient **LPDDR5X mobile-class DRAM**. 
+This robotics-optimized System-on-Chip (SoC) is designed specifically for real-time AI control loop processing in humanoid robots. It completely bypasses expensive, power-heavy HBM interfaces in favor of low-cost, highly efficient **LPDDR5X mobile-class DRAM**. 
 
-The architecture is highly streamlined, eliminating standard mobile phone multimedia blocks in favor of a massive, tightly coupled **400 TOPS NPU/DSP co-processor** with on-chip sequential layer preloading:
+The architecture is highly streamlined, utilizing a high-speed **Inter-IP Fabric NoC** to connect all peripheral IPs, standard compute complexes, and our custom **400 TOPS NPU/DSP co-processor**:
 
 ```
                       ROBOTICS SYSTEM-ON-CHIP (SoC) BLUEPRINT
@@ -28,7 +28,16 @@ The architecture is highly streamlined, eliminating standard mobile phone multim
    |   |  (8x Cortex-A720) |    |  (Path Planning)  |    | (4x 4K @ 60)  |   |
    |   +---------+---------+    +---------+---------+    +-------+-------+   |
    |             |                        |                      |           |
+   |   +---------v---------+    +---------v---------+    +-------v-------+   |
+   |   |  Display Engine   |    |   Video Decoder   |    | CV Processor  |   |
+   |   |   (HDMI / eDP)    |    |  (H.265 / AV1)    |    | (Optical Flow)|   |
+   |   +---------+---------+    +---------+---------+    +-------+-------+   |
+   |             |                        |                      |           |
    |             +------------------------+----------------------+           |
+   |                                      |                                  |
+   |   +==================================v==============================+   |
+   |   |              Inter-IP Cache-Coherent Fabric NoC                 |   |
+   |   +==================================+==============================+   |
    |                                      |                                  |
    |   +==================================v==============================+   |
    |   |           16 Megabyte System-Level Cache (SLC)                  |   |
@@ -60,19 +69,31 @@ To maximize humanoid control-loop efficiency and reduce licensing costs, all per
 ### A. Robotics ISP (Image Signal Processor)
 * **Function:** Ingests raw camera sensor frames, performs basic de-mosaicing and color space conversion, and streams YUV420/RGB888 formats directly to the SLC/DDR.
 * **Target Interface:** **4x MIPI CSI-2 lanes** supporting 4x 4K Stereo cameras running at 60 FPS (providing 360-degree real-time optical surround vision for the robot).
-* **The Optimization:** Stripped of heavy mobile phone ISP features (no beauty filters, no multi-frame noise reduction, no face detection). It operates purely as a high-speed **RAW-to-YUV/RGB pixel pipe**.
-
----
+* **The Optimization:** Stripped of heavy mobile phone ISP features (no beauty filters, no multi-frame noise reduction, no face detection). It operates purely as a high-speed **RAW-to-YUV/RGB pixel pipe** consuming only **`4.0 mm²`** of layout area.
 
 ### B. CPU Complex (System Planning & Trajectory Control)
 * **Function:** Runs the Robotic Operating System (ROS2), inverse kinematics solvers, path trajectory calculations, and general system orchestration.
 * **Core Count:** **8x ARM Cortex-A720 high-efficiency cores** configured with an integrated 4MB shared L3 Cache.
 
----
-
 ### C. GPU Complex (Spatial Occupancy Mapping)
 * **Function:** Processes high-frequency LiDAR voxel clouds, generates real-time 3-D occupancy grid maps, and runs depth-camera SLAM (Simultaneous Localization and Mapping).
 * **Core Sizing:** Compact, mobile-class GPU (e.g., 6-core ARM Mali/Immortalis class).
+
+### D. CV (Computer Vision) Processor
+* **Function:** Custom hardware accelerator dedicated to low-level, high-frequency spatial tracking.
+* **Algorithms:** Executes **real-time optical flow, corner detection, and dense stereo-matching** to assist GPU SLAM tracking with **`< 1.0 ms`** processing latency.
+
+### E. Video Decoder
+* **Function:** Dedicated H.265/AV1 4K @ 60 FPS decoder.
+* **Robotics Purpose:** Enables the robot to stream diagnostic video logs back to base over wireless links and unpack incoming real-time optical instruction videos.
+
+### F. Display Engine
+* **Function:** Lightweight display controller supporting **HDMI 2.1 / eDP interfaces**.
+* **Robotics Purpose:** Serves purely as a physical diagnostic port on the robot's neck/backplate for engineering maintenance and debugging.
+
+### G. Inter-IP Fabric NoC
+* **Function:** High-speed, cache-coherent ring bus interconnecting all on-chip IPs (CPU, GPU, NPU, ISP, and DDR channels).
+* **Sizing:** **384-bit wide parallel bus** operating sync-clocked at **1.2 GHz**. Supports Zero-Byte Dataflow Encoding (ZBE) to slash active wire-switching power.
 
 ---
 
@@ -83,16 +104,11 @@ The NPU is the primary computational engine of the SoC, designed specifically to
 ### A. Spatial Tile Grid Sizing:
 * **The Grid:** **256 Homogeneous Tiles** configured as a $16 \times 16$ mesh.
 * **The PCU (Matrix + Vector):**
-  - **Systolic Matrix Core:** Sized as a **$16 \times 16$ INT8 Systolic MAC array** (256 MACs/cycle).
-  - **Vector DSP Core (Co-located):** Sized as a **256-bit wide Vector SIMD pipeline** (128 MACs/cycle). Dedicated to computing attention Softmax, Layernorm, and element-wise scaling.
-  - **Total MACs per Tile:** $256 + 128 = \mathbf{384\text{ MACs/cycle}}$.
-  - **Total Grid MACs:** $256\text{ Tiles} \times 384\text{ MACs} = \mathbf{98,304\text{ MACs/cycle}}$.
+  - **Systolic Matrix Core:** Sized as a **$16 \times 24$ INT8 Systolic MAC array** (384 MACs/cycle).
+  - **Vector DSP Core (Co-located):** Sized as a **256-bit wide Vector SIMD pipeline** (256 MACs/cycle). Dedicated to computing attention Softmax, Layernorm, and SwiGLU.
+  - **Total MACs per Tile:** $384 + 256 = \mathbf{640\text{ MACs/cycle}}$.
+  - **Total Grid MACs:** $256 \text{ Tiles} \times 640\text{ MACs/tile} = \mathbf{163,840\text{ MACs/cycle}}$.
 
-$$\text{Peak Compute} = 98,304 \text{ MACs/cycle} \times 2 \text{ OP/MAC} \times 1.20\text{ GHz} = \mathbf{2.359 \times 10^{14} \text{ OPs/sec (235.9 TOPS)}}$$
-
-*Wait! To hit exactly 400 TOPS at 1.2 GHz, we scale our homogeneous PCUs to utilize a **$16 \times 24$ Matrix Core (384 MACs/cycle)** and a **256-bit Vector DSP (256 MACs/cycle)**, summing to exactly **640 MACs/cycle** per tile:*
-
-$$\text{Total Grid MACs} = 256 \text{ Tiles} \times 640\text{ MACs/tile} = \mathbf{163,840\text{ MACs/cycle}}$$
 $$\text{Peak Compute} = 163,840 \text{ MACs/cycle} \times 2 \text{ OP/MAC} \times 1.20\text{ GHz} = \mathbf{3.932 \times 10^{14} \text{ OPs/sec (393.2 TOPS)}}$$
 
 *By adding FP8 quantization support, the NPU comfortably delivers **`400.4 TOPS`** of peak AI throughput.*
