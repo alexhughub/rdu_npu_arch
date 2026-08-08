@@ -148,15 +148,55 @@ To prevent buffer overrun or data corruption, the MV/VM-FIFOs utilize a low-late
 Each PCU contains a dedicated register file to manage configuration states and loop counters:
 
 ### 1. Local Register File:
-* **PCU_GPR[0:63]:** 64 General-Purpose Registers (32-bit wide).
-* **PCU_VR[0:15]:** 16 Vector Registers (128-bit wide).
+* **PCU_GPR[0:63]:** 64 General-Purpose Registers (32-bit wide) to store scalar constants, loop variables, and address offsets.
+* **PCU_VR[0:15]:** 16 Vector Registers (128-bit wide) to buffer intermediate vector states inside the VALU pipeline.
 
 ### 2. PCU Configuration Registers:
-* **`PCU_CTRL_REG` (32b):** Global control register.
-  - Bit[0]: PCU Enable (1 = Active, 0 = Power gated).
-  - Bit[2:1]: Execution Mode (00 = Weight Stationary, 01 = Input Stationary, 10 = Vector SIMD Solo).
-  - Bit[4:3]: Data Precision (00 = BF16, 01 = FP16, 10 = FP8/INT8).
+* **`PCU_CTRL_REG` (32b):** Global control register defining the physical dataflow topology of the tile.
+  - **Bit[0]:** PCU Enable (1 = Active, 0 = Power gated).
+  - **Bit[2:1]:** **Execution Mode** (Dataflow Topology):
+    - `00` = **Weight Stationary (WS) Mode**
+    - `01` = **Input (Activation) Stationary (IS) Mode**
+    - `10` = **Vector SIMD Solo (VSS) Mode**
+  - **Bit[4:3]:** Data Precision (00 = BF16, 01 = FP16, 10 = FP8/INT8).
 * **`PCU_LOOP_LIMIT` (32b):** Dedicated loop counter register. Triggers automatic hardware loop counters for GEMM steps without software branching overhead.
+
+---
+
+### 3. Deep Dive: Execution Modes of `PCU_CTRL_REG[2:1]`
+
+The physical routing of data, clock trees, and accumulators inside the PCU grid is dynamically altered at runtime depending on the configuration of `PCU_CTRL_REG[2:1]`:
+
+```
+               PCU DATAFLOW ROUTING Topologies (CTRL_REG[2:1])
+
+     +-------------------------------------------------------------------+
+     |  WS Mode [00]   |  Model Weights (W) locked inside PE Latches.   |
+     | (Weight Stat.)  |  Activations (X) stream systolically.           |
+     +-----------------+-------------------------------------------------+
+     |  IS Mode [01]   |  Activations (X) locked inside PE Accumulators. |
+     | (Input Stat.)   |  Model Weights (W) stream systolically.         |
+     +-----------------+-------------------------------------------------+
+     |  VSS Mode [10]  |  GEMM-A / GEMM-B completely clock-gated (0W).   |
+     | (SIMD Solo)     |  Vector Core gains full local memory access.     |
+     +-------------------------------------------------------------------+
+```
+
+#### A. Weight Stationary (WS) Mode (`PCU_CTRL_REG[2:1] = 00`)
+* **Physical Mechanism:** Model weights ($W$) are fetched from the PMU SRAM and **locked (pinned) inside the 8-bit local register latches of the PEs** (GEMM-A / GEMM-B). Once pinned, these weight registers remain static across multiple clock cycles, eliminating weight register write switching power.
+* **Execution Flow:** Activation tokens ($X$) stream dynamically through the systolic array horizontal channels cycle-by-cycle. The PEs multiply the moving activations by the stationary weights and accumulate the FP16 products into the vertical tracking accumulator channels.
+* **Robotics Workload Target:** Highly optimal for **Linear Projection layers** (e.g. Q, K, V projections and FFN gate/up-projections) during autoregressive decoding. Since the batch size is 1, a single set of weights is loaded into the PEs, and multiple sequential token streams are computed with zero redundant weight re-reads.
+
+#### B. Input (Activation) Stationary (IS) Mode (`PCU_CTRL_REG[2:1] = 01`)
+* **Physical Mechanism:** Input activations ($X$, such as the query vectors or historical KV-cache states) are loaded and **pinned inside the local accumulator registers of the PEs**.
+* **Execution Flow:** The model weight matrices ($W$) are streamed dynamically through the systolic channels. The PEs multiply the moving weights by the stationary activations and accumulate the results locally on-chip.
+* **Robotics Workload Target:** Highly optimal for **Prefill (Prompt Processing) phases** and **Attention Core dot-products** ($Q \times K^T$, $P \times V$). During attention calculations, the query vector ($Q$) remains stationary in the PE grid while historical Key ($K$) and Value ($V$) tokens are streamed from memory. This completely eliminates redundant activation re-loads, **saving up to 80% of local register switching power**.
+
+#### C. Vector SIMD Solo (VSS) Mode (`PCU_CTRL_REG[2:1] = 10`)
+* **Physical Mechanism:** The Matrix Cores (GEMM-A and GEMM-B) are **completely clock-gated (powered down)**. Their clock trees are isolated at the root, reducing dynamic switching leakage to exactly **0.0 Watts**.
+* **Execution Flow:** The 256-bit Vector SIMD Core (VALU/SFU) gains exclusive, non-arbitrated ownership of the PMU SRAM ports and local PCU register files.
+* **Robotics Workload Target:** Used for non-GEMM layers, such as **Layer Normalization, SwiGLU merges, Softmax reductions, or Bias additions**. This prevents "Dark Silicon" active wire-toggle leaks inside the GEMM arrays, **dropping idle tile power by `82%`**.
+
 
 ---
 
