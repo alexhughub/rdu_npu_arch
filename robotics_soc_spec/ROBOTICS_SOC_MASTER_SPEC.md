@@ -13,7 +13,7 @@ This robotics-optimized System-on-Chip (SoC) is designed specifically for real-t
 The architecture is highly streamlined, utilizing a high-speed **Inter-IP Fabric NoC** to connect all peripheral IPs, standard compute complexes, and our custom **400 TOPS NPU/DSP co-processor**:
 
 ```
-                      ROBOTICS SYSTEM-ON-CHIP (SoC) BLUEPRINT
+                      ROBOTICS SYSTEM-ON-ON-CHIP (SoC) BLUEPRINT
                       
    +-------------------------------------------------------------------------+
    |                       4x 32-bit LPDDR5X-8533 Channels                   |
@@ -45,9 +45,10 @@ The architecture is highly streamlined, utilizing a high-speed **Inter-IP Fabric
    |                                      |                                  |
    |   +==================================v==============================+   |
    |   |        CUSTOM ROBOTICS NPU & VECTOR DSP CO-PROCESSOR            |   |
-   |   |   - 256 Homogeneous PCU/PMU Tiles (16x16 Grid) @ 1.2 GHz        |   |
+   |   |   - 256 Tiles (16x16 Grid) @ 1.2 GHz with Dual-Matrix Pipelines |   |
    |   |   - 32 Megabytes Tightly-Coupled Low-Leakage SRAM               |   |
-   |   |   - Co-located PCU DSP lanes utilizing local MV/VM Bypass FIFOs |   |
+   |   |   - Co-located PCU Dual Matrix (GEMM-A / GEMM-B) & Vector DSP   |   |
+   |   |     connected over local MV/VM Bypass FIFOs                     |   |
    |   +-----------------------------------------------------------------+   |
    |                                                                         |
    +=========================================================================+
@@ -68,15 +69,15 @@ To maximize humanoid control-loop efficiency and reduce licensing costs, all per
 
 ### A. Robotics ISP (Image Signal Processor)
 * **Function:** Ingests raw camera sensor frames, performs basic de-mosaicing and color space conversion, and streams YUV420/RGB888 formats directly to the SLC/DDR.
-* **Target Interface:** **4x MIPI CSI-2 lanes** supporting 4x 4K Stereo cameras running at 60 FPS (providing 360-degree real-time optical surround vision for the robot).
-* **The Optimization:** Stripped of heavy mobile phone ISP features (no beauty filters, no multi-frame noise reduction, no face detection). It operates purely as a high-speed **RAW-to-YUV/RGB pixel pipe** consuming only **`4.0 mm²`** of layout area.
+* **Target Interface:** **4x MIPI CSI-2 lanes** supporting 4x 4K Stereo cameras running at 60 FPS.
+* **The Optimization:** Stripped of heavy mobile phone ISP features. It operates purely as a high-speed **RAW-to-YUV/RGB pixel pipe** consuming only **`4.0 mm²`** of layout area.
 
 ### B. CPU Complex (System Planning & Trajectory Control)
 * **Function:** Runs the Robotic Operating System (ROS2), inverse kinematics solvers, path trajectory calculations, and general system orchestration.
 * **Core Count:** **8x ARM Cortex-A720 high-efficiency cores** configured with an integrated 4MB shared L3 Cache.
 
 ### C. GPU Complex (Spatial Occupancy Mapping)
-* **Function:** Processes high-frequency LiDAR voxel clouds, generates real-time 3-D occupancy grid maps, and runs depth-camera SLAM (Simultaneous Localization and Mapping).
+* **Function:** Processes high-frequency LiDAR voxel clouds, generates real-time 3-D occupancy grid maps, and runs depth-camera SLAM.
 * **Core Sizing:** Compact, mobile-class GPU (e.g., 6-core ARM Mali/Immortalis class).
 
 ### D. CV (Computer Vision) Processor
@@ -97,16 +98,18 @@ To maximize humanoid control-loop efficiency and reduce licensing costs, all per
 
 ---
 
-## 3. Custom Robotics NPU & Co-Located DSP Sizing
+## 3. Custom Robotics NPU & Co-Located Dual-Matrix DSP Sizing
 
 The NPU is the primary computational engine of the SoC, designed specifically to run Robotic Transformers (such as RT-2, or spatial robotic control models) with ultra-low latency and zero off-chip memory thrashes.
 
 ### A. Spatial Tile Grid Sizing:
 * **The Grid:** **256 Homogeneous Tiles** configured as a $16 \times 16$ mesh.
-* **The PCU (Matrix + Vector):**
-  - **Systolic Matrix Core:** Sized as a **$16 \times 24$ INT8 Systolic MAC array** (384 MACs/cycle).
+* **The PCU (Dual-Matrix GEMM-A / GEMM-B + Vector DSP):**
+  To support concurrent **Dual-Core Ping-Pong Pipelining** of the attention loop without any silicon area bloat, we partition our single 384-MAC Matrix Core into two independent, smaller systolic cores per tile PCU:
+  - **Matrix Core A (GEMM-A):** Sized as a **$16 \times 12$ INT8 Systolic MAC array** (192 MACs/cycle). Dedicated to computing Query-Key matrix scores ($Q \times K^T$).
+  - **Matrix Core B (GEMM-B):** Sized as a **$16 \times 12$ INT8 Systolic MAC array** (192 MACs/cycle). Dedicated to computing attention value products ($Attention \times V$).
   - **Vector DSP Core (Co-located):** Sized as a **256-bit wide Vector SIMD pipeline** (256 MACs/cycle). Dedicated to computing attention Softmax, Layernorm, and SwiGLU.
-  - **Total MACs per Tile:** $384 + 256 = \mathbf{640\text{ MACs/cycle}}$.
+  - **Total MACs per Tile:** $192\text{ (GEMM-A)} + 192\text{ (GEMM-B)} + 256\text{ (Vector DSP)} = \mathbf{640\text{ MACs/cycle}}$.
   - **Total Grid MACs:** $256 \text{ Tiles} \times 640\text{ MACs/tile} = \mathbf{163,840\text{ MACs/cycle}}$.
 
 $$\text{Peak Compute} = 163,840 \text{ MACs/cycle} \times 2 \text{ OP/MAC} \times 1.20\text{ GHz} = \mathbf{3.932 \times 10^{14} \text{ OPs/sec (393.2 TOPS)}}$$
@@ -120,8 +123,8 @@ $$\text{Peak Compute} = 163,840 \text{ MACs/cycle} \times 2 \text{ OP/MAC} \time
 * **Total Tightly-Coupled SRAM:** $256 \text{ PMUs} \times 128\text{ KB} = \mathbf{32.0 \text{ Megabytes}}$!
 * **Co-located DSP Bypass FIFOs:**
   To completely avoid energy-intensive memory-to-memory roundtrips during attention Softmax loops, each tile PCU features our custom **Direct Matrix-to-Vector local bypass FIFOs** (`MV_FIFO` and `VM_FIFO`). 
-  - Raw attention scores ($Q \times K^T$) flow directly through short local registers, bypass the PMU SRAM entirely, and are normalized by the Vector DSP on-chip.
-  - This sashes local PMU memory-access power by **`35.6%`**, preventing thermal hot spots in the humanoid's head cavity.
+  - Raw attention scores ($Q \times K^T$) flow directly from **GEMM-A** through `MV_FIFO` to the Vector DSP on-the-fly, are normalized by the Vector DSP, and flow directly through `VM_FIFO` to **GEMM-B** to multiply by $V$ without ever touching the PMU SRAM!
+  - This slashes local PMU memory-access power by **`35.6%`**, preventing thermal hot spots in the humanoid's head cavity.
 
 ---
 *Report compiled and drafted as the Downstream Micro-Arch baseline.*
