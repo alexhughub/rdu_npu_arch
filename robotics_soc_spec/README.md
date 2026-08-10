@@ -17,6 +17,7 @@ This directory houses the master co-design blueprint, memory bandwidth models, a
 | [**MEM_BW_DDR_ANALYSIS.md**](./MEM_BW_DDR_ANALYSIS.md) | Physical memory bandwidth slicing across all IPs (ISP, CPU, GPU, NPU weight streams), LPDDR5X-8533 bus parameters, and memory space mapping. | **Memory Bandwidth** |
 | [**SRAM_SLC_SIZING_JUSTIFICATION.md**](./SRAM_SLC_SIZING_JUSTIFICATION.md) | Rigorous mathematical and physical derivation justifying why the NPU SRAM (32 MB) is larger than the System-Level Cache (SLC, 16 MB). | **Workload Sizing** |
 | [**AREA_POWER_YIELD_ESTIMATE.md**](./AREA_POWER_YIELD_ESTIMATE.md) | Detailed silicon layout area sizing per IP, manufacturing costs (high-yield TSMC 4nm), active power TDP budgets, and RTL power-saving optimizations. | **Area, Power, & Cost** |
+| [**NPU_ARCH_COMPARISON_REPORT.md**](./NPU_ARCH_COMPARISON_REPORT.md) | Detailed comparison between Grid NPU and Monolithic NPU arch. Grid excels on performance/power/area, while Monolithic reduce compiler effort and more friendly to SW deployment| **NPU Arch Choice** |
 
 ---
 
